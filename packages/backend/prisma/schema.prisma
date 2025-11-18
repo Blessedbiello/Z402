@@ -1,0 +1,137 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Merchant {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  zcashAddress  String
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  payments      Payment[]
+  apiKeys       ApiKey[]
+  webhooks      Webhook[]
+
+  @@index([email])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  merchantId  String
+  keyHash     String    @unique
+  name        String
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  merchant    Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([keyHash])
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  merchantId      String
+  amount          Decimal       @db.Decimal(18, 8)
+  currency        String        @default("ZEC")
+  status          PaymentStatus @default(PENDING)
+  zcashAddress    String?
+  txid            String?       @unique
+  confirmations   Int           @default(0)
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  merchant        Merchant      @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([txid])
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+}
+
+model Transaction {
+  id              String          @id @default(cuid())
+  paymentId       String
+  type            TransactionType
+  txid            String
+  amount          Decimal         @db.Decimal(18, 8)
+  from            String
+  to              String
+  confirmations   Int             @default(0)
+  blockHeight     Int?
+  timestamp       DateTime
+  createdAt       DateTime        @default(now())
+
+  payment         Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@index([txid])
+}
+
+enum WebhookEvent {
+  PAYMENT_CREATED
+  PAYMENT_CONFIRMED
+  PAYMENT_FAILED
+  PAYMENT_REFUNDED
+}
+
+model Webhook {
+  id          String         @id @default(cuid())
+  merchantId  String
+  url         String
+  events      WebhookEvent[]
+  secret      String
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  merchant    Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([merchantId])
+}
+
+model WebhookDelivery {
+  id          String   @id @default(cuid())
+  webhookId   String
+  event       WebhookEvent
+  payload     Json
+  statusCode  Int?
+  response    String?
+  success     Boolean  @default(false)
+  attempts    Int      @default(1)
+  createdAt   DateTime @default(now())
+
+  webhook     Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([createdAt])
+}
