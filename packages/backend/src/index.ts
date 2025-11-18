@@ -3,12 +3,14 @@ import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
 
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 import { logger } from './config/logger';
 import { config } from './config';
 import routes from './routes';
+import { swaggerSpec } from './config/swagger';
 
 // Load environment variables
 dotenv.config();
@@ -34,6 +36,23 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
   });
+});
+
+// API Documentation (Swagger UI)
+app.use(
+  '/api/v1/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Z402 API Documentation',
+    customfavIcon: '/favicon.ico',
+  })
+);
+
+// Swagger JSON endpoint
+app.get('/api/v1/docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
 });
 
 // API routes

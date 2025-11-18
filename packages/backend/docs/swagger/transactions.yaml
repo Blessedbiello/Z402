@@ -1,0 +1,311 @@
+paths:
+  /transactions:
+    get:
+      tags:
+        - Transactions
+      summary: List transactions
+      description: Retrieve a paginated list of transactions with optional filtering and sorting
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Items per page
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, VERIFIED, SETTLED, FAILED, EXPIRED, REFUNDED]
+          description: Filter by transaction status
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter by start date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter by end date
+        - name: minAmount
+          in: query
+          schema:
+            type: number
+          description: Minimum transaction amount
+        - name: maxAmount
+          in: query
+          schema:
+            type: number
+          description: Maximum transaction amount
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by ID, txid, resource URL, or client address
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, amount, status, settledAt]
+            default: createdAt
+          description: Sort field
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order
+      responses:
+        '200':
+          description: Transactions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /transactions/{id}:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction details
+      description: Retrieve detailed information about a specific transaction
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Transaction ID
+      responses:
+        '200':
+          description: Transaction retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  transaction:
+                    allOf:
+                      - $ref: '#/components/schemas/Transaction'
+                      - type: object
+                        properties:
+                          paymentIntent:
+                            type: object
+                            description: Associated payment intent
+                          webhookDeliveries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/WebhookDelivery'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /transactions/{id}/refund:
+    post:
+      tags:
+        - Transactions
+      summary: Refund a transaction
+      description: Issue a full or partial refund for a settled transaction
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Transaction ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  description: Refund amount (defaults to full amount if not specified)
+                  example: 0.05
+                reason:
+                  type: string
+                  description: Reason for refund
+                  example: Customer request
+      responses:
+        '200':
+          description: Refund initiated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Refund initiated successfully
+                  refund:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      amount:
+                        type: number
+                      status:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+        '400':
+          description: Cannot refund transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /transactions/export/data:
+    get:
+      tags:
+        - Transactions
+      summary: Export transactions
+      description: Export transactions as CSV or JSON
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [csv, json]
+          description: Export format
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, VERIFIED, SETTLED, FAILED, EXPIRED, REFUNDED]
+          description: Filter by status
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Start date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: End date
+      responses:
+        '200':
+          description: Export successful
+          content:
+            text/csv:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  exportedAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /transactions/stats/summary:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction statistics
+      description: Retrieve summary statistics for merchant transactions
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  stats:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 1000
+                      settled:
+                        type: integer
+                        example: 850
+                      pending:
+                        type: integer
+                        example: 100
+                      verified:
+                        type: integer
+                        example: 30
+                      failed:
+                        type: integer
+                        example: 20
+                      totalVolume:
+                        type: number
+                        example: 125.5
+                      successRate:
+                        type: number
+                        example: 85.0
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
