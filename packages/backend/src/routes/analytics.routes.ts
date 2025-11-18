@@ -11,11 +11,309 @@ import {
 } from '../validators/analytics.validators';
 import prisma from '../db';
 import { Prisma } from '@prisma/client';
+import AnalyticsService from '../services/analytics';
+import DashboardQueries from '../queries/dashboard';
+import EventTrackingService from '../services/events';
+import ExportService from '../services/export.service';
 
 const router = Router();
 
 // All routes require authentication
 router.use(authenticate);
+
+/**
+ * GET /api/v1/analytics/realtime
+ * Get real-time metrics (updated every 30 seconds)
+ */
+router.get('/realtime', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+
+    const metrics = await AnalyticsService.getRealTimeMetrics(merchantId);
+
+    res.status(200).json({
+      success: true,
+      metrics,
+    });
+  } catch (error) {
+    console.error('Get realtime metrics error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get real-time metrics',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/dashboard
+ * Get complete dashboard metrics with trends
+ */
+router.get('/dashboard', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+
+    const metrics = await AnalyticsService.getDashboardMetrics(merchantId);
+
+    res.status(200).json({
+      success: true,
+      metrics,
+    });
+  } catch (error) {
+    console.error('Get dashboard metrics error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get dashboard metrics',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/trends/today
+ * Get today vs yesterday comparison
+ */
+router.get('/trends/today', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+
+    const trends = await DashboardQueries.getTodayVsYesterday(merchantId);
+
+    res.status(200).json({
+      success: true,
+      ...trends,
+    });
+  } catch (error) {
+    console.error('Get today trends error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get today trends',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/trends/week
+ * Get 7-day revenue trend
+ */
+router.get('/trends/week', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+
+    const trend = await DashboardQueries.get7DayTrend(merchantId);
+
+    res.status(200).json({
+      success: true,
+      trend,
+    });
+  } catch (error) {
+    console.error('Get week trends error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get week trends',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/trends/month
+ * Get 30-day comparison
+ */
+router.get('/trends/month', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+
+    const trends = await DashboardQueries.get30DayComparison(merchantId);
+
+    res.status(200).json({
+      success: true,
+      ...trends,
+    });
+  } catch (error) {
+    console.error('Get month trends error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get month trends',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/peak-times
+ * Get peak transaction times
+ */
+router.get('/peak-times', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+    const days = parseInt(req.query.days as string) || 30;
+
+    const peakTimes = await DashboardQueries.getPeakTimes(merchantId, days);
+
+    res.status(200).json({
+      success: true,
+      peakTimes,
+    });
+  } catch (error) {
+    console.error('Get peak times error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get peak times',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/success-rate
+ * Get success rate over time
+ */
+router.get('/success-rate', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+    const days = parseInt(req.query.days as string) || 7;
+
+    const successRate = await DashboardQueries.getSuccessRateOverTime(merchantId, days);
+
+    res.status(200).json({
+      success: true,
+      successRate,
+    });
+  } catch (error) {
+    console.error('Get success rate error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get success rate',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/failures
+ * Get failure analysis
+ */
+router.get('/failures', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+    const days = parseInt(req.query.days as string) || 30;
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const analysis = await EventTrackingService.analyzeFailures(
+      merchantId,
+      startDate,
+      endDate
+    );
+
+    res.status(200).json({
+      success: true,
+      analysis,
+    });
+  } catch (error) {
+    console.error('Get failure analysis error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get failure analysis',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/webhook-metrics
+ * Get webhook delivery metrics
+ */
+router.get('/webhook-metrics', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+    const days = parseInt(req.query.days as string) || 30;
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const metrics = await EventTrackingService.getWebhookMetrics(
+      merchantId,
+      startDate,
+      endDate
+    );
+
+    res.status(200).json({
+      success: true,
+      metrics,
+    });
+  } catch (error) {
+    console.error('Get webhook metrics error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get webhook metrics',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/latency
+ * Get payment latency metrics
+ */
+router.get('/latency', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+    const days = parseInt(req.query.days as string) || 7;
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const latency = await EventTrackingService.getPaymentLatency(
+      merchantId,
+      startDate,
+      endDate
+    );
+
+    res.status(200).json({
+      success: true,
+      latency,
+    });
+  } catch (error) {
+    console.error('Get latency metrics error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get latency metrics',
+    });
+  }
+});
+
+/**
+ * GET /api/v1/analytics/reports/monthly
+ * Get monthly report
+ */
+router.get('/reports/monthly', async (req: Request, res: Response) => {
+  try {
+    const merchantId = (req as any).user.id;
+    const monthStr = req.query.month as string;
+    const format = (req.query.format as string) || 'json';
+
+    const month = monthStr ? new Date(monthStr) : new Date();
+
+    if (format === 'html') {
+      const html = await ExportService.exportMonthlyReportHTML(merchantId, month);
+
+      res.setHeader('Content-Type', 'text/html');
+      res.send(html);
+      return;
+    }
+
+    const report = await ExportService.generateMonthlyReport(merchantId, month);
+
+    res.status(200).json({
+      success: true,
+      report,
+    });
+  } catch (error) {
+    console.error('Get monthly report error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get monthly report',
+    });
+  }
+});
 
 /**
  * Helper function to get date range from period

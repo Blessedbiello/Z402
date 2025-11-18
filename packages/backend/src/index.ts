@@ -11,6 +11,7 @@ import { logger } from './config/logger';
 import { config } from './config';
 import routes from './routes';
 import { swaggerSpec } from './config/swagger';
+import { startAggregationJobs, stopAggregationJobs } from './jobs/aggregate-metrics';
 
 // Load environment variables
 dotenv.config();
@@ -66,11 +67,17 @@ app.use(errorHandler);
 const server = app.listen(PORT, () => {
   logger.info(`🚀 Z402 Backend running on port ${PORT} in ${config.nodeEnv} mode`);
   logger.info(`📊 Health check: http://localhost:${PORT}/health`);
+  logger.info(`📄 API Docs: http://localhost:${PORT}/api/v1/docs`);
+
+  // Start aggregation jobs
+  startAggregationJobs();
+  logger.info('📈 Analytics aggregation jobs started');
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM signal received: closing HTTP server');
+  stopAggregationJobs();
   server.close(() => {
     logger.info('HTTP server closed');
     process.exit(0);
@@ -79,6 +86,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   logger.info('SIGINT signal received: closing HTTP server');
+  stopAggregationJobs();
   server.close(() => {
     logger.info('HTTP server closed');
     process.exit(0);
