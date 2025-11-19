@@ -1,37 +1,66 @@
-import type { Z402Client } from '../client';
+/**
+ * Webhooks resource
+ */
+
+import type { HttpClient } from '../utils/http';
 import type {
-  Webhook,
-  CreateWebhookParams,
+  WebhookConfig,
   UpdateWebhookParams,
-} from '../types';
+} from '../types/index';
 
-export class WebhooksAPI {
-  constructor(private client: Z402Client) {}
+export class Webhooks {
+  constructor(private readonly http: HttpClient) {}
 
-  async list(): Promise<Webhook[]> {
-    return this.client.request<Webhook[]>('GET', '/webhooks');
+  /**
+   * Get webhook configuration
+   * @returns Webhook configuration
+   * @example
+   * ```typescript
+   * const config = await z402.webhooks.get();
+   * console.log(config.url, config.secret);
+   * ```
+   */
+  async get(): Promise<WebhookConfig> {
+    return this.http.get<WebhookConfig>('/webhook-management');
   }
 
-  async create(params: CreateWebhookParams): Promise<Webhook> {
-    return this.client.request<Webhook>('POST', '/webhooks', {
-      body: params,
-    });
+  /**
+   * Update webhook configuration
+   * @param params Webhook parameters
+   * @returns Updated webhook configuration
+   * @example
+   * ```typescript
+   * await z402.webhooks.update({
+   *   webhookUrl: 'https://example.com/webhooks/z402',
+   *   events: ['payment.settled', 'payment.failed']
+   * });
+   * ```
+   */
+  async update(params: UpdateWebhookParams): Promise<WebhookConfig> {
+    return this.http.put<WebhookConfig>('/webhook-management', params);
   }
 
-  async retrieve(webhookId: string): Promise<Webhook> {
-    return this.client.request<Webhook>('GET', `/webhooks/${webhookId}`);
+  /**
+   * Delete webhook configuration
+   * @example
+   * ```typescript
+   * await z402.webhooks.delete();
+   * ```
+   */
+  async delete(): Promise<void> {
+    await this.http.delete<void>('/webhook-management');
   }
 
-  async update(
-    webhookId: string,
-    params: UpdateWebhookParams
-  ): Promise<Webhook> {
-    return this.client.request<Webhook>('PUT', `/webhooks/${webhookId}`, {
-      body: params,
-    });
-  }
-
-  async delete(webhookId: string): Promise<void> {
-    await this.client.request<void>('DELETE', `/webhooks/${webhookId}`);
+  /**
+   * Test webhook by sending a test event
+   * @returns Test result
+   * @example
+   * ```typescript
+   * const result = await z402.webhooks.test();
+   * console.log(result.success, result.response);
+   * ```
+   */
+  async test(): Promise<{ success: boolean; response?: any }> {
+    return this.http.post<{ success: boolean; response?: any }>('/webhook-management/test');
   }
 }

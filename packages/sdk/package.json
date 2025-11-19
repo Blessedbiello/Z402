@@ -1,10 +1,27 @@
 {
   "name": "@z402/sdk",
   "version": "0.1.0",
-  "description": "Z402 JavaScript/TypeScript SDK",
+  "description": "Developer-friendly TypeScript SDK for Z402 payment facilitator",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./express": {
+      "require": "./dist/middleware/express.js",
+      "import": "./dist/middleware/express.mjs",
+      "types": "./dist/middleware/express.d.ts"
+    },
+    "./nextjs": {
+      "require": "./dist/middleware/nextjs.js",
+      "import": "./dist/middleware/nextjs.mjs",
+      "types": "./dist/middleware/nextjs.d.ts"
+    }
+  },
   "files": [
     "dist"
   ],

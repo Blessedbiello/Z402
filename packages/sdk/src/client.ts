@@ -1,67 +1,62 @@
-import { PaymentsAPI } from './resources/payments';
-import { MerchantsAPI } from './resources/merchants';
-import { WebhooksAPI } from './resources/webhooks';
-import { Z402Error } from './errors';
-import type { Z402Config, RequestOptions } from './types';
+/**
+ * Z402 SDK Client
+ *
+ * @example
+ * ```typescript
+ * import { Z402 } from '@z402/sdk';
+ *
+ * const z402 = new Z402({
+ *   apiKey: 'z402_test_...',
+ *   network: 'testnet'
+ * });
+ *
+ * // Create payment intent
+ * const intent = await z402.payments.create({
+ *   amount: '0.01',
+ *   resource: '/api/premium/data'
+ * });
+ * ```
+ */
 
-export class Z402Client {
-  private apiKey: string;
-  private baseUrl: string;
-  private apiVersion: string;
+import { HttpClient } from './utils/http';
+import { Payments } from './resources/payments';
+import { Transactions } from './resources/transactions';
+import { Webhooks } from './resources/webhooks';
+import type { Z402Config } from './types/index';
 
-  public payments: PaymentsAPI;
-  public merchants: MerchantsAPI;
-  public webhooks: WebhooksAPI;
+export class Z402 {
+  private readonly http: HttpClient;
 
+  /** Payments API */
+  public readonly payments: Payments;
+
+  /** Transactions API */
+  public readonly transactions: Transactions;
+
+  /** Webhooks API */
+  public readonly webhooks: Webhooks;
+
+  /**
+   * Create a new Z402 client
+   * @param config Configuration options
+   */
   constructor(config: Z402Config) {
-    this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || 'https://api.z402.com';
-    this.apiVersion = config.apiVersion || 'v1';
+    if (!config.apiKey) {
+      throw new Error('API key is required');
+    }
+
+    if (!config.apiKey.startsWith('z402_')) {
+      throw new Error('Invalid API key format. API keys should start with "z402_"');
+    }
+
+    this.http = new HttpClient(config);
 
     // Initialize resource APIs
-    this.payments = new PaymentsAPI(this);
-    this.merchants = new MerchantsAPI(this);
-    this.webhooks = new WebhooksAPI(this);
-  }
-
-  async request<T>(
-    method: string,
-    path: string,
-    options: RequestOptions = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}/api/${this.apiVersion}${path}`;
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${this.apiKey}`,
-      ...options.headers,
-    };
-
-    try {
-      const response = await fetch(url, {
-        method,
-        headers,
-        body: options.body ? JSON.stringify(options.body) : undefined,
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({
-          message: response.statusText,
-        }));
-        throw new Z402Error(
-          error.message || 'Request failed',
-          response.status
-        );
-      }
-
-      return (await response.json()) as T;
-    } catch (error) {
-      if (error instanceof Z402Error) {
-        throw error;
-      }
-      throw new Z402Error(
-        error instanceof Error ? error.message : 'Unknown error',
-        500
-      );
-    }
+    this.payments = new Payments(this.http);
+    this.transactions = new Transactions(this.http);
+    this.webhooks = new Webhooks(this.http);
   }
 }
+
+// Export for backward compatibility
+export { Z402 as Z402Client };
