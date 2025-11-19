@@ -1,0 +1,11 @@
+{
+  "title": "Guides",
+  "pages": [
+    "accept-payments",
+    "webhooks",
+    "refunds",
+    "testing",
+    "security",
+    "addresses"
+  ]
+}

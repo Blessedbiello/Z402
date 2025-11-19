@@ -1,0 +1,349 @@
+---
+title: Quick Start
+description: Accept your first Z402 payment in 5 minutes
+---
+
+# Quick Start
+
+Get up and running with Z402 in under 5 minutes. This guide will walk you through creating your first payment intent and verifying a payment.
+
+## Prerequisites
+
+- Node.js 18+ or Python 3.8+
+- A Z402 API key (sign up at [dashboard.z402.io](https://dashboard.z402.io))
+- Basic knowledge of TypeScript or Python
+
+## Step 1: Install the SDK
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```bash
+    npm install @z402/sdk
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```bash
+    pip install z402-sdk
+    ```
+  </Tab>
+</Tabs>
+
+## Step 2: Initialize the Client
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```typescript
+    import { Z402 } from '@z402/sdk';
+
+    const z402 = new Z402({
+      apiKey: process.env.Z402_API_KEY,
+      network: 'testnet' // Use 'mainnet' for production
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    import os
+    from z402 import Z402Client
+
+    client = Z402Client(
+        api_key=os.getenv('Z402_API_KEY'),
+        network='testnet'  # Use 'mainnet' for production
+    )
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+  **Tip:** Store your API key in environment variables, never hardcode it in your source code.
+</Callout>
+
+## Step 3: Create a Payment Intent
+
+A payment intent represents a request for payment. It includes the amount, resource URL, and generates a Zcash address for payment.
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```typescript
+    const intent = await z402.payments.create({
+      amount: '0.01', // 0.01 ZEC
+      resource: '/api/premium/data',
+      metadata: {
+        userId: 'user_123',
+        plan: 'premium'
+      }
+    });
+
+    console.log('Payment Intent Created:');
+    console.log('ID:', intent.id);
+    console.log('Amount:', intent.amount, 'ZEC');
+    console.log('Pay to:', intent.zcashAddress);
+    console.log('Expires:', intent.expiresAt);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    from z402 import CreatePaymentIntentParams
+
+    async with client:
+        intent = await client.payments.create(
+            CreatePaymentIntentParams(
+                amount='0.01',
+                resource='/api/premium/data',
+                metadata={
+                    'user_id': 'user_123',
+                    'plan': 'premium'
+                }
+            )
+        )
+
+        print('Payment Intent Created:')
+        print('ID:', intent.id)
+        print('Amount:', intent.amount, 'ZEC')
+        print('Pay to:', intent.zcash_address)
+        print('Expires:', intent.expires_at)
+    ```
+  </Tab>
+</Tabs>
+
+**Response:**
+```json
+{
+  "id": "pi_1234567890abcdef",
+  "amount": "0.01",
+  "resource": "/api/premium/data",
+  "status": "pending",
+  "zcashAddress": "zs1abcdef...",
+  "expiresAt": "2025-01-20T12:00:00Z",
+  "createdAt": "2025-01-20T11:00:00Z"
+}
+```
+
+## Step 4: User Makes Payment
+
+At this point, your user would:
+
+1. Copy the Zcash address from `intent.zcashAddress`
+2. Send the exact amount (`0.01 ZEC`) to that address
+3. Get a transaction ID from their wallet
+
+For testing, you can use the [Zcash Testnet Faucet](https://faucet.testnet.z.cash/) to get test ZEC.
+
+<Callout type="warning">
+  **Test Mode:** In testnet, payments use test ZEC which has no real value. Switch to `network: 'mainnet'` for production.
+</Callout>
+
+## Step 5: Verify the Payment
+
+Once the user has sent the payment, verify it:
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```typescript
+    // Poll for payment verification
+    const checkPayment = async (intentId: string) => {
+      const verified = await z402.payments.verify(intentId);
+
+      if (verified.status === 'settled') {
+        console.log('✓ Payment verified and settled!');
+        // Grant access to the resource
+        return true;
+      } else if (verified.status === 'paid') {
+        console.log('Payment received, waiting for confirmation...');
+        return false;
+      } else if (verified.status === 'failed') {
+        console.log('✗ Payment failed');
+        return false;
+      }
+
+      console.log('Payment still pending...');
+      return false;
+    };
+
+    // Check payment status
+    await checkPayment(intent.id);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    async def check_payment(intent_id: str) -> bool:
+        verified = await client.payments.verify(intent_id)
+
+        if verified.status == PaymentStatus.SETTLED:
+            print('✓ Payment verified and settled!')
+            # Grant access to the resource
+            return True
+        elif verified.status == PaymentStatus.PAID:
+            print('Payment received, waiting for confirmation...')
+            return False
+        elif verified.status == PaymentStatus.FAILED:
+            print('✗ Payment failed')
+            return False
+
+        print('Payment still pending...')
+        return False
+
+    # Check payment status
+    await check_payment(intent.id)
+    ```
+  </Tab>
+</Tabs>
+
+## Step 6: Handle Webhooks (Recommended)
+
+Instead of polling, set up webhooks to be notified when payments are confirmed:
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```typescript
+    import { verifyWebhook } from '@z402/sdk';
+
+    app.post('/webhooks/z402', (req, res) => {
+      const signature = req.headers['z402-signature'];
+
+      try {
+        const event = verifyWebhook(
+          req.body,
+          signature,
+          process.env.Z402_WEBHOOK_SECRET
+        );
+
+        if (event.type === 'payment.settled') {
+          console.log('Payment settled:', event.data.id);
+          // Grant access to user
+        }
+
+        res.json({ received: true });
+      } catch (error) {
+        res.status(400).send('Invalid signature');
+      }
+    });
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    from z402 import verify_webhook
+
+    @app.post('/webhooks/z402')
+    async def handle_webhook(request: Request):
+        signature = request.headers.get('z402-signature')
+        body = await request.body()
+
+        try:
+            event = verify_webhook(body, signature, webhook_secret)
+
+            if event['type'] == 'payment.settled':
+                print('Payment settled:', event['data']['id'])
+                # Grant access to user
+
+            return {'received': True}
+        except WebhookVerificationError:
+            return {'error': 'Invalid signature'}, 400
+    ```
+  </Tab>
+</Tabs>
+
+## Complete Example
+
+Here's a complete working example:
+
+<Tabs items={['TypeScript', 'Python']}>
+  <Tab value="TypeScript">
+    ```typescript
+    import { Z402 } from '@z402/sdk';
+
+    const z402 = new Z402({
+      apiKey: process.env.Z402_API_KEY,
+      network: 'testnet'
+    });
+
+    async function acceptPayment() {
+      // 1. Create payment intent
+      const intent = await z402.payments.create({
+        amount: '0.01',
+        resource: '/api/premium/data'
+      });
+
+      console.log(`Pay ${intent.amount} ZEC to: ${intent.zcashAddress}`);
+      console.log(`Payment ID: ${intent.id}`);
+
+      // 2. Wait for payment (or use webhooks)
+      let settled = false;
+      while (!settled) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        const verified = await z402.payments.verify(intent.id);
+
+        if (verified.status === 'settled') {
+          console.log('✓ Payment verified!');
+          settled = true;
+        } else {
+          console.log('Waiting for payment...');
+        }
+      }
+
+      // 3. Grant access
+      console.log('Access granted to premium data!');
+    }
+
+    acceptPayment().catch(console.error);
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```python
+    import asyncio
+    from z402 import Z402Client, CreatePaymentIntentParams, PaymentStatus
+
+    async def accept_payment():
+        async with Z402Client(
+            api_key='z402_test_...',
+            network='testnet'
+        ) as client:
+            # 1. Create payment intent
+            intent = await client.payments.create(
+                CreatePaymentIntentParams(
+                    amount='0.01',
+                    resource='/api/premium/data'
+                )
+            )
+
+            print(f'Pay {intent.amount} ZEC to: {intent.zcash_address}')
+            print(f'Payment ID: {intent.id}')
+
+            # 2. Wait for payment (or use webhooks)
+            settled = False
+            while not settled:
+                await asyncio.sleep(5)
+
+                verified = await client.payments.verify(intent.id)
+
+                if verified.status == PaymentStatus.SETTLED:
+                    print('✓ Payment verified!')
+                    settled = True
+                else:
+                    print('Waiting for payment...')
+
+            # 3. Grant access
+            print('Access granted to premium data!')
+
+    asyncio.run(accept_payment())
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+Congratulations! You've successfully created and verified your first Z402 payment.
+
+Now explore:
+
+- [Protect Your API](/docs/guides/accept-payments) - Add payment protection to your endpoints
+- [Set Up Webhooks](/docs/guides/webhooks) - Get real-time payment notifications
+- [API Reference](/docs/api-reference) - Complete API documentation
+- [SDK Documentation](/docs/sdk) - Advanced SDK features
+
+## Need Help?
+
+- [FAQ](/docs/resources/faq) - Common questions
+- [GitHub Discussions](https://github.com/z402/discussions) - Community support
+- [Discord](https://discord.gg/z402) - Chat with the team
