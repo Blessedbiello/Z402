@@ -1,0 +1,237 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run E2E tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '8.x'
+
+jobs:
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: z402_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @z402/frontend exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run database migrations
+        run: pnpm --filter @z402/backend prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/z402_test
+
+      - name: Seed test database
+        run: pnpm --filter @z402/backend prisma db seed
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/z402_test
+
+      - name: Build backend
+        run: pnpm --filter @z402/backend build
+
+      - name: Build frontend
+        run: pnpm --filter @z402/frontend build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+
+      - name: Start backend server
+        run: pnpm --filter @z402/backend start &
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/z402_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret-key-for-e2e
+          NODE_ENV: test
+          PORT: 3000
+
+      - name: Wait for backend
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
+
+      - name: Start frontend server
+        run: pnpm --filter @z402/frontend start &
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+          PORT: 3001
+
+      - name: Wait for frontend
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3001; do sleep 2; done'
+
+      - name: Run Playwright tests
+        run: pnpm --filter @z402/frontend exec playwright test --project=${{ matrix.browser }}
+        env:
+          BASE_URL: http://localhost:3001
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-results-${{ matrix.browser }}
+          path: packages/frontend/test-results/
+          retention-days: 7
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: packages/frontend/playwright-report/
+          retention-days: 7
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-screenshots-${{ matrix.browser }}
+          path: packages/frontend/test-results/**/*.png
+          retention-days: 7
+
+      - name: Upload videos
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-videos-${{ matrix.browser }}
+          path: packages/frontend/test-results/**/*.webm
+          retention-days: 7
+
+  mobile-e2e:
+    name: E2E Tests (Mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: z402_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      matrix:
+        device: ['Mobile Chrome', 'Mobile Safari']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @z402/frontend exec playwright install --with-deps
+
+      - name: Run database migrations
+        run: pnpm --filter @z402/backend prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/z402_test
+
+      - name: Start services
+        run: |
+          pnpm --filter @z402/backend build
+          pnpm --filter @z402/frontend build
+          pnpm --filter @z402/backend start &
+          pnpm --filter @z402/frontend start &
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/z402_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret-key-for-e2e
+          NEXT_PUBLIC_API_URL: http://localhost:3000
+
+      - name: Wait for services
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
+          timeout 60 bash -c 'until curl -f http://localhost:3001; do sleep 2; done'
+
+      - name: Run mobile tests
+        run: pnpm --filter @z402/frontend exec playwright test --project="${{ matrix.device }}"
+        env:
+          BASE_URL: http://localhost:3001
+
+      - name: Upload mobile test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: mobile-results-${{ matrix.device }}
+          path: packages/frontend/test-results/
+          retention-days: 7

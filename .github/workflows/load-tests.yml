@@ -1,0 +1,249 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Load test scenario'
+        required: true
+        type: choice
+        options:
+          - payment-intent-creation
+          - complete-payment-flow
+          - api-endpoints
+          - rate-limiting
+          - all
+      duration:
+        description: 'Test duration (minutes)'
+        required: false
+        default: '5'
+      target_vus:
+        description: 'Target virtual users'
+        required: false
+        default: '100'
+
+  schedule:
+    # Run load tests weekly on Sunday at 3 AM UTC
+    - cron: '0 3 * * 0'
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '8.x'
+
+jobs:
+  load-test:
+    name: Load Test - ${{ github.event.inputs.scenario || 'all' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: z402_load_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run database migrations
+        run: pnpm --filter @z402/backend prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/z402_load_test
+
+      - name: Build and start backend
+        run: |
+          pnpm --filter @z402/backend build
+          pnpm --filter @z402/backend start &
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/z402_load_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret-key-for-load
+          NODE_ENV: production
+          PORT: 3000
+
+      - name: Wait for backend
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000/health; do sleep 2; done'
+
+      - name: Create test API key
+        id: api_key
+        run: |
+          API_KEY=$(curl -s -X POST http://localhost:3000/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"load-test@example.com","password":"LoadTest123!"}' \
+            | jq -r '.apiKey')
+          echo "API_KEY=$API_KEY" >> $GITHUB_OUTPUT
+          echo "Created API key: ${API_KEY:0:15}..."
+
+      - name: Run payment intent creation test
+        if: github.event.inputs.scenario == 'payment-intent-creation' || github.event.inputs.scenario == 'all' || github.event.inputs.scenario == ''
+        run: |
+          cd packages/backend/tests/load
+          k6 run payment-intent-creation.js \
+            --env BASE_URL=http://localhost:3000 \
+            --env API_KEY=${{ steps.api_key.outputs.API_KEY }} \
+            --out json=results-payment-creation.json
+
+      - name: Run complete payment flow test
+        if: github.event.inputs.scenario == 'complete-payment-flow' || github.event.inputs.scenario == 'all' || github.event.inputs.scenario == ''
+        run: |
+          cd packages/backend/tests/load
+          k6 run complete-payment-flow.js \
+            --env BASE_URL=http://localhost:3000 \
+            --env API_KEY=${{ steps.api_key.outputs.API_KEY }} \
+            --out json=results-payment-flow.json
+
+      - name: Run API endpoints stress test
+        if: github.event.inputs.scenario == 'api-endpoints' || github.event.inputs.scenario == 'all' || github.event.inputs.scenario == ''
+        run: |
+          cd packages/backend/tests/load
+          k6 run api-endpoints.js \
+            --env BASE_URL=http://localhost:3000 \
+            --env API_KEY=${{ steps.api_key.outputs.API_KEY }} \
+            --out json=results-api-stress.json
+
+      - name: Run rate limiting test
+        if: github.event.inputs.scenario == 'rate-limiting' || github.event.inputs.scenario == 'all' || github.event.inputs.scenario == ''
+        run: |
+          cd packages/backend/tests/load
+          k6 run rate-limiting.js \
+            --env BASE_URL=http://localhost:3000 \
+            --env API_KEY=${{ steps.api_key.outputs.API_KEY }} \
+            --out json=results-rate-limiting.json
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: k6-load-test-results
+          path: packages/backend/tests/load/results-*.json
+          retention-days: 30
+
+      - name: Parse and display results
+        if: always()
+        run: |
+          echo "## Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for file in packages/backend/tests/load/results-*.json; do
+            if [ -f "$file" ]; then
+              echo "### $(basename $file .json)" >> $GITHUB_STEP_SUMMARY
+              echo '```json' >> $GITHUB_STEP_SUMMARY
+              jq '.metrics | {
+                http_reqs: .http_reqs.values.count,
+                http_req_duration: {
+                  avg: .http_req_duration.values.avg,
+                  p95: .http_req_duration.values["p(95)"],
+                  p99: .http_req_duration.values["p(99)"]
+                },
+                http_req_failed: .http_req_failed.values.rate
+              }' "$file" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Check thresholds
+        if: always()
+        run: |
+          # Check if any tests failed thresholds
+          FAILED=0
+          for file in packages/backend/tests/load/results-*.json; do
+            if [ -f "$file" ]; then
+              # Check if error rate is acceptable
+              ERROR_RATE=$(jq -r '.metrics.http_req_failed.values.rate' "$file")
+              if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
+                echo "❌ $(basename $file): Error rate too high: $ERROR_RATE"
+                FAILED=1
+              fi
+
+              # Check if p95 is acceptable
+              P95=$(jq -r '.metrics.http_req_duration.values["p(95)"]' "$file")
+              if (( $(echo "$P95 > 2000" | bc -l) )); then
+                echo "⚠️  $(basename $file): p95 latency high: ${P95}ms"
+              fi
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo "Load tests failed threshold checks"
+            exit 1
+          fi
+
+          echo "✅ All load tests passed"
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const results = [];
+
+            const files = fs.readdirSync('packages/backend/tests/load')
+              .filter(f => f.startsWith('results-') && f.endsWith('.json'));
+
+            for (const file of files) {
+              const data = JSON.parse(fs.readFileSync(`packages/backend/tests/load/${file}`));
+              results.push({
+                name: file.replace('results-', '').replace('.json', ''),
+                metrics: data.metrics
+              });
+            }
+
+            let comment = '## 📊 Load Test Results\n\n';
+            comment += '| Test | Requests | Avg Latency | p95 | Error Rate |\n';
+            comment += '|------|----------|-------------|-----|------------|\n';
+
+            for (const result of results) {
+              const m = result.metrics;
+              comment += `| ${result.name} | ${m.http_reqs.values.count} | ${m.http_req_duration.values.avg.toFixed(2)}ms | ${m.http_req_duration.values['p(95)'].toFixed(2)}ms | ${(m.http_req_failed.values.rate * 100).toFixed(2)}% |\n`;
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
