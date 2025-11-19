@@ -4,6 +4,7 @@ import prisma from '../db';
 import { JWTService, TokenPair } from '../utils/jwt';
 import { logger } from '../config/logger';
 import { zcashClient } from '../integrations/zcash';
+import { EmailService } from './email.service';
 
 /**
  * Authentication Service
@@ -99,7 +100,19 @@ export class AuthService {
         },
       });
 
-      // TODO: Send verification email
+      // Send verification email
+      try {
+        const verificationToken = JWTService.generateEmailVerificationToken(merchant.email);
+        await EmailService.sendVerificationEmail(merchant.email, verificationToken);
+        logger.info('Verification email sent', { merchantId: merchant.id, email: merchant.email });
+      } catch (emailError) {
+        logger.error('Failed to send verification email', {
+          merchantId: merchant.id,
+          error: emailError instanceof Error ? emailError.message : 'Unknown error',
+        });
+        // Don't fail registration if email fails
+      }
+
       logger.info('Merchant registered', { merchantId: merchant.id, email: merchant.email });
 
       return {
@@ -308,7 +321,17 @@ export class AuthService {
       // Generate reset token
       const token = JWTService.generatePasswordResetToken(email);
 
-      // TODO: Send reset email
+      // Send password reset email
+      try {
+        await EmailService.sendPasswordResetEmail(email, token);
+        logger.info('Password reset email sent', { email });
+      } catch (emailError) {
+        logger.error('Failed to send password reset email', {
+          email,
+          error: emailError instanceof Error ? emailError.message : 'Unknown error',
+        });
+        // Don't fail the request if email fails
+      }
 
       logger.info('Password reset requested', { email });
 

@@ -48,6 +48,37 @@ export const config = {
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
   },
+
+  // Email Configuration
+  email: {
+    provider: process.env.EMAIL_PROVIDER || 'console', // 'sendgrid' | 'aws-ses' | 'smtp' | 'console'
+    fromAddress: process.env.EMAIL_FROM_ADDRESS || 'noreply@z402.io',
+    fromName: process.env.EMAIL_FROM_NAME || 'Z402',
+
+    // SendGrid
+    sendgrid: {
+      apiKey: process.env.SENDGRID_API_KEY,
+    },
+
+    // AWS SES
+    awsSes: {
+      region: process.env.AWS_SES_REGION || 'us-east-1',
+      accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY,
+    },
+
+    // SMTP
+    smtp: {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER,
+      password: process.env.SMTP_PASSWORD,
+    },
+  },
+
+  // Frontend URL (for email links)
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 } as const;
 
 // Validate required environment variables

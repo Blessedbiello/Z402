@@ -3,6 +3,7 @@ import prisma from '../db';
 import { Prisma } from '@prisma/client';
 import { logger } from '../config/logger';
 import AnalyticsService from '../services/analytics';
+import { EmailService } from '../services/email.service';
 
 /**
  * Metric Aggregation Jobs
@@ -449,8 +450,30 @@ export const monthlyReportGeneration = new CronJob(
           `Generated monthly report for merchant ${merchant.id}: Revenue=${revenue._sum.amount}`
         );
 
-        // TODO: Send email with monthly report
-        // await EmailService.sendMonthlyReport(merchant.email, report);
+        // Send monthly report email
+        try {
+          await EmailService.sendMonthlyReport(merchant.email, merchant.name, {
+            totalRevenue: (revenue._sum.amount || 0).toString(),
+            totalTransactions: successRate,
+            successRate: successRatePercent / 100,
+            topResources: topResources.map((r) => ({
+              resource: r.resourceUrl,
+              revenue: (r._sum.amount || 0).toString(),
+              count: r._count,
+            })),
+            period: monthStart.toLocaleDateString('en-US', {
+              month: 'long',
+              year: 'numeric',
+            }),
+          });
+          logger.info('Monthly report email sent', { merchantId: merchant.id });
+        } catch (emailError) {
+          logger.error('Failed to send monthly report email', {
+            merchantId: merchant.id,
+            error: emailError instanceof Error ? emailError.message : 'Unknown error',
+          });
+          // Don't fail the job if email fails
+        }
       }
 
       logger.info('Completed monthly report generation');

@@ -12,6 +12,7 @@ import { config } from './config';
 import routes from './routes';
 import { swaggerSpec } from './config/swagger';
 import { startAggregationJobs, stopAggregationJobs } from './jobs/aggregate-metrics';
+import { EmailService } from './services/email.service';
 
 // Load environment variables
 dotenv.config();
@@ -68,6 +69,15 @@ const server = app.listen(PORT, () => {
   logger.info(`🚀 Z402 Backend running on port ${PORT} in ${config.nodeEnv} mode`);
   logger.info(`📊 Health check: http://localhost:${PORT}/health`);
   logger.info(`📄 API Docs: http://localhost:${PORT}/api/v1/docs`);
+
+  // Initialize email service
+  try {
+    EmailService.initialize();
+    logger.info(`📧 Email service initialized (provider: ${config.email.provider})`);
+  } catch (error) {
+    logger.error('Failed to initialize email service', error);
+    // Don't crash the server if email initialization fails
+  }
 
   // Start aggregation jobs
   startAggregationJobs();
