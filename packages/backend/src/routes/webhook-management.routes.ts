@@ -10,6 +10,7 @@ import {
 } from '../validators/webhook.validators';
 import prisma from '../db';
 import { WebhookService } from '../services/webhook.service';
+import { logger } from '../config/logger';
 import crypto from 'crypto';
 
 const router = Router();
@@ -55,19 +56,18 @@ router.put('/', validate(configureWebhookSchema), async (req: Request, res: Resp
       updateData.webhookSecret = crypto.randomBytes(32).toString('hex');
     }
 
-    // Store enabled state in metadata
+    // Store enabled state in settings
     if (enabled !== undefined || events !== undefined) {
-      const currentMetadata = (merchant.metadata as any) || {};
-      updateData.metadata = {
-        ...currentMetadata,
-        webhookEnabled: enabled !== undefined ? enabled : currentMetadata.webhookEnabled ?? true,
-        webhookEvents: events || currentMetadata.webhookEvents || [
-          'payment.verified',
-          'payment.settled',
-          'payment.failed',
-          'payment.expired',
-          'refund.created',
-          'refund.completed',
+      const currentSettings = (merchant.settings as any) || {};
+      updateData.settings = {
+        ...currentSettings,
+        webhookEnabled: enabled !== undefined ? enabled : currentSettings.webhookEnabled ?? true,
+        webhookEvents: events || currentSettings.webhookEvents || [
+          'PAYMENT_VERIFIED',
+          'PAYMENT_SETTLED',
+          'PAYMENT_FAILED',
+          'PAYMENT_EXPIRED',
+          'PAYMENT_REFUNDED',
         ],
       };
     }
@@ -77,21 +77,13 @@ router.put('/', validate(configureWebhookSchema), async (req: Request, res: Resp
       data: updateData,
     });
 
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        merchantId,
-        action: 'WEBHOOK_CONFIGURED',
-        resourceType: 'Merchant',
-        resourceId: merchantId,
-        metadata: {
-          webhookUrl: updatedMerchant.webhookUrl,
-          hasSecret: !!updatedMerchant.webhookSecret,
-          enabled: (updatedMerchant.metadata as any)?.webhookEnabled,
-          events: (updatedMerchant.metadata as any)?.webhookEvents,
-        },
-      },
+    logger.info('Webhook configuration updated via webhook-management', {
+      merchantId,
+      webhookUrl: updatedMerchant.webhookUrl,
+      hasSecret: !!updatedMerchant.webhookSecret,
     });
+
+    const updatedSettings = (updatedMerchant.settings as any) || {};
 
     res.status(200).json({
       success: true,
@@ -99,14 +91,13 @@ router.put('/', validate(configureWebhookSchema), async (req: Request, res: Resp
       webhook: {
         url: updatedMerchant.webhookUrl,
         secret: updatedMerchant.webhookSecret,
-        enabled: (updatedMerchant.metadata as any)?.webhookEnabled ?? true,
-        events: (updatedMerchant.metadata as any)?.webhookEvents || [
-          'payment.verified',
-          'payment.settled',
-          'payment.failed',
-          'payment.expired',
-          'refund.created',
-          'refund.completed',
+        enabled: updatedSettings.webhookEnabled ?? true,
+        events: updatedSettings.webhookEvents || [
+          'PAYMENT_VERIFIED',
+          'PAYMENT_SETTLED',
+          'PAYMENT_FAILED',
+          'PAYMENT_EXPIRED',
+          'PAYMENT_REFUNDED',
         ],
       },
     });
@@ -132,7 +123,7 @@ router.get('/', async (req: Request, res: Response) => {
       select: {
         webhookUrl: true,
         webhookSecret: true,
-        metadata: true,
+        settings: true,
       },
     });
 
@@ -144,19 +135,20 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
 
+    const settings = (merchant.settings as any) || {};
+
     res.status(200).json({
       success: true,
       webhook: {
         url: merchant.webhookUrl,
         secret: merchant.webhookSecret,
-        enabled: (merchant.metadata as any)?.webhookEnabled ?? true,
-        events: (merchant.metadata as any)?.webhookEvents || [
-          'payment.verified',
-          'payment.settled',
-          'payment.failed',
-          'payment.expired',
-          'refund.created',
-          'refund.completed',
+        enabled: settings.webhookEnabled ?? true,
+        events: settings.webhookEvents || [
+          'PAYMENT_VERIFIED',
+          'PAYMENT_SETTLED',
+          'PAYMENT_FAILED',
+          'PAYMENT_EXPIRED',
+          'PAYMENT_REFUNDED',
         ],
       },
     });
@@ -205,24 +197,29 @@ router.post('/test', validate(testWebhookSchema), async (req: Request, res: Resp
       test: true,
     };
 
-    // Deliver test webhook
-    const result = await WebhookService.deliver({
+    // Send test webhook
+    await WebhookService.sendWebhook({
       merchantId,
-      eventType: eventType as any,
+      eventType: 'PAYMENT_VERIFIED' as any, // Map to enum value
       payload: testPayload,
-      isTest: true,
+    });
+
+    // Get the most recent webhook delivery for this merchant
+    const delivery = await prisma.webhookDelivery.findFirst({
+      where: { merchantId },
+      orderBy: { createdAt: 'desc' },
     });
 
     res.status(200).json({
       success: true,
       message: 'Test webhook sent',
-      delivery: {
-        id: result.id,
-        status: result.status,
-        attempts: result.attempts,
-        response: result.response,
-        deliveredAt: result.deliveredAt,
-      },
+      delivery: delivery ? {
+        id: delivery.id,
+        status: delivery.status,
+        attempts: delivery.attempts,
+        httpStatusCode: delivery.httpStatusCode,
+        deliveredAt: delivery.deliveredAt,
+      } : null,
     });
   } catch (error) {
     console.error('Test webhook error:', error);
@@ -273,10 +270,12 @@ router.get('/logs', validate(getWebhookLogsSchema), async (req: Request, res: Re
         eventType: true,
         status: true,
         attempts: true,
-        response: true,
+        httpStatusCode: true,
+        responseBody: true,
+        errorMessage: true,
         deliveredAt: true,
         createdAt: true,
-        nextRetryAt: true,
+        nextAttemptAt: true,
       },
     });
 
@@ -326,7 +325,7 @@ router.post('/:id/retry', validate(retryWebhookSchema), async (req: Request, res
     }
 
     // Check if already delivered
-    if (delivery.status === 'DELIVERED') {
+    if (delivery.status === 'SENT') {
       res.status(400).json({
         success: false,
         error: 'Webhook already delivered successfully',
@@ -335,7 +334,7 @@ router.post('/:id/retry', validate(retryWebhookSchema), async (req: Request, res
     }
 
     // Check if max retries reached
-    if (delivery.attempts >= 5) {
+    if (delivery.attempts >= delivery.maxAttempts) {
       res.status(400).json({
         success: false,
         error: 'Maximum retry attempts reached',
@@ -343,20 +342,44 @@ router.post('/:id/retry', validate(retryWebhookSchema), async (req: Request, res
       return;
     }
 
-    // Retry webhook delivery
-    const result = await WebhookService.retry(deliveryId);
+    // Get merchant webhook configuration
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: merchantId },
+      select: { webhookUrl: true, webhookSecret: true },
+    });
+
+    if (!merchant?.webhookUrl) {
+      res.status(400).json({
+        success: false,
+        error: 'Webhook URL not configured',
+      });
+      return;
+    }
+
+    // Retry by resending webhook
+    await WebhookService.sendWebhook({
+      merchantId,
+      transactionId: delivery.transactionId || undefined,
+      eventType: delivery.eventType,
+      payload: delivery.payload as Record<string, unknown>,
+    });
+
+    // Get updated delivery
+    const updatedDelivery = await prisma.webhookDelivery.findUnique({
+      where: { id: deliveryId },
+    });
 
     res.status(200).json({
       success: true,
       message: 'Webhook retry initiated',
-      delivery: {
-        id: result.id,
-        status: result.status,
-        attempts: result.attempts,
-        response: result.response,
-        deliveredAt: result.deliveredAt,
-        nextRetryAt: result.nextRetryAt,
-      },
+      delivery: updatedDelivery ? {
+        id: updatedDelivery.id,
+        status: updatedDelivery.status,
+        attempts: updatedDelivery.attempts,
+        httpStatusCode: updatedDelivery.httpStatusCode,
+        deliveredAt: updatedDelivery.deliveredAt,
+        nextAttemptAt: updatedDelivery.nextAttemptAt,
+      } : null,
     });
   } catch (error) {
     console.error('Retry webhook error:', error);
@@ -380,7 +403,7 @@ router.get('/stats', validate(getWebhookStatsSchema), async (req: Request, res: 
     startDate.setDate(startDate.getDate() - days);
 
     // Get stats
-    const [total, delivered, failed, pending] = await Promise.all([
+    const [total, sent, failed, pending, retrying] = await Promise.all([
       prisma.webhookDelivery.count({
         where: {
           merchantId,
@@ -390,7 +413,7 @@ router.get('/stats', validate(getWebhookStatsSchema), async (req: Request, res: 
       prisma.webhookDelivery.count({
         where: {
           merchantId,
-          status: 'DELIVERED',
+          status: 'SENT',
           createdAt: { gte: startDate },
         },
       }),
@@ -405,6 +428,13 @@ router.get('/stats', validate(getWebhookStatsSchema), async (req: Request, res: 
         where: {
           merchantId,
           status: 'PENDING',
+          createdAt: { gte: startDate },
+        },
+      }),
+      prisma.webhookDelivery.count({
+        where: {
+          merchantId,
+          status: 'RETRYING',
           createdAt: { gte: startDate },
         },
       }),
@@ -424,10 +454,11 @@ router.get('/stats', validate(getWebhookStatsSchema), async (req: Request, res: 
       success: true,
       stats: {
         total,
-        delivered,
+        sent,
         failed,
         pending,
-        successRate: total > 0 ? (delivered / total) * 100 : 0,
+        retrying,
+        successRate: total > 0 ? (sent / total) * 100 : 0,
         byEventType: byEventType.reduce((acc, item) => {
           acc[item.eventType] = item._count;
           return acc;
