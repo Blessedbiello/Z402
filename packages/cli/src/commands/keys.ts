@@ -2,9 +2,9 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import Table from 'cli-table3';
-import { logger } from '../utils/logger;
-import { api } from '../utils/api;
-import { hasApiKey } from '../utils/config;
+import { logger } from '../utils/logger';
+import { api } from '../utils/api';
+import { hasApiKey } from '../utils/config';
 
 export const keysCommand = new Command('keys')
   .description('Manage API keys');

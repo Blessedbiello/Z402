@@ -33,6 +33,7 @@ export interface Transaction {
   currency: string;
   status: string;
   resourceUrl: string;
+  transactionId?: string;
   createdAt: string;
   paidAt?: string;
   verifiedAt?: string;

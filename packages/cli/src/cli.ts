@@ -86,8 +86,8 @@ program
   .description('Display current logged-in user')
   .action(async () => {
     try {
-      const { hasApiKey, getConfig } = await import('./utils/config);
-      const { api } = await import('./utils/api);
+      const { hasApiKey, getConfig } = require('./utils/config');
+      const { api } = require('./utils/api');
 
       if (!hasApiKey()) {
         logger.error('Not logged in. Run: z402 login');
@@ -119,7 +119,7 @@ program
   .option('--list', 'List all configuration')
   .action(async (key, options) => {
     try {
-      const { getConfig, setConfig, getEnvironment } = await import('./utils/config);
+      const { getConfig, setConfig, getEnvironment } = require('./utils/config');
 
       if (options.set) {
         const [configKey, value] = options.set.split('=');

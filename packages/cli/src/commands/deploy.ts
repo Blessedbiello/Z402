@@ -1,11 +1,11 @@
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import ora from 'ora';
-import { execa } from 'execa';
+import execa = require('execa');
 import fs from 'fs-extra';
 import path from 'path';
-import { logger } from '../utils/logger;
-import { hasApiKey, getApiKey, getMerchantId } from '../utils/config;
+import { logger } from '../utils/logger';
+import { hasApiKey, getApiKey, getMerchantId } from '../utils/config';
 
 export const deployCommand = new Command('deploy')
   .description('Deploy your Z402-integrated application')

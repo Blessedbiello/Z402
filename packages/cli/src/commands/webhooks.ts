@@ -2,9 +2,10 @@ import { Command } from 'commander';
 import ora from 'ora';
 import inquirer from 'inquirer';
 import Table from 'cli-table3';
-import { logger } from '../utils/logger;
-import { api } from '../utils/api;
-import { hasApiKey } from '../utils/config;
+import chalk from 'chalk';
+import { logger } from '../utils/logger';
+import { api } from '../utils/api';
+import { hasApiKey } from '../utils/config';
 
 export const webhooksCommand = new Command('webhooks')
   .description('Manage webhooks');

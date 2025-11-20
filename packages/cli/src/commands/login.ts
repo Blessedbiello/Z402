@@ -2,9 +2,9 @@ import { Command } from 'commander';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import open from 'open';
-import { logger } from '../utils/logger;
-import { api } from '../utils/api;
-import { setApiKey, setMerchantId, setConfig } from '../utils/config;
+import { logger } from '../utils/logger';
+import { api } from '../utils/api';
+import { setApiKey, setMerchantId, setConfig } from '../utils/config';
 
 export const loginCommand = new Command('login')
   .description('Authenticate with Z402 account')

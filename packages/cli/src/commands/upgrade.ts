@@ -1,11 +1,11 @@
 import { Command } from 'commander';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { execa } from 'execa';
+import execa = require('execa');
 import fs from 'fs-extra';
 import path from 'path';
 import semver from 'semver';
-import { logger } from '../utils/logger;
+import { logger } from '../utils/logger';
 
 export const upgradeCommand = new Command('upgrade')
   .description('Upgrade Z402 dependencies')

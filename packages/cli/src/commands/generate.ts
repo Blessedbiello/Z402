@@ -3,7 +3,7 @@ import inquirer from 'inquirer';
 import fs from 'fs-extra';
 import path from 'path';
 import Handlebars from 'handlebars';
-import { logger } from '../utils/logger;
+import { logger } from '../utils/logger';
 
 export const generateCommand = new Command('generate')
   .alias('g')

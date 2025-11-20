@@ -2,9 +2,9 @@ import { Command } from 'commander';
 import ora from 'ora';
 import Table from 'cli-table3';
 import chalk from 'chalk';
-import { logger } from '../utils/logger;
-import { api } from '../utils/api;
-import { hasApiKey } from '../utils/config;
+import { logger } from '../utils/logger';
+import { api } from '../utils/api';
+import { hasApiKey } from '../utils/config';
 
 export const analyticsCommand = new Command('analytics')
   .description('View analytics in terminal')

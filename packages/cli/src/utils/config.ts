@@ -1,5 +1,5 @@
 import Conf from 'conf';
-import { Z402Config } from '../types/index;
+import { Z402Config } from '../types/index';
 
 const config = new Conf<Z402Config>({
   projectName: 'z402',

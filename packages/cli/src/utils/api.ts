@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
-import { getConfig, getApiKey } from './config;
-import { ApiKey, Transaction, Analytics } from '../types/index;
+import { getConfig, getApiKey } from './config';
+import { ApiKey, Transaction, Analytics } from '../types/index';
 
 class Z402API {
   private client: AxiosInstance;

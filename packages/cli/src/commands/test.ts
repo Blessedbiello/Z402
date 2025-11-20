@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { logger } from '../utils/logger;
-import { api } from '../utils/api;
-import { hasApiKey, getEnvironment } from '../utils/config;
+import { logger } from '../utils/logger';
+import { api } from '../utils/api';
+import { hasApiKey, getEnvironment } from '../utils/config';
 
 export const testCommand = new Command('test')
   .description('Test payment flows locally');

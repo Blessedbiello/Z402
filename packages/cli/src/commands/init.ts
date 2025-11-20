@@ -4,10 +4,10 @@ import ora from 'ora';
 import chalk from 'chalk';
 import fs from 'fs-extra';
 import path from 'path';
-import { execa } from 'execa';
+import execa = require('execa');
 import validatePackageName from 'validate-npm-package-name';
-import { logger } from '../utils/logger;
-import { ProjectConfig } from '../types/index;
+import { logger } from '../utils/logger';
+import { ProjectConfig } from '../types/index';
 
 export const initCommand = new Command('init')
   .description('Initialize a new Z402-integrated project')
@@ -103,7 +103,7 @@ async function getProjectConfig(options: any): Promise<ProjectConfig> {
         { name: 'Next.js Application', value: 'nextjs' },
         { name: 'FastAPI (Python)', value: 'fastapi' },
         { name: 'NestJS Application', value: 'nestjs' },
-        { name: 'Plain Node, value: 'nodejs' },
+        { name: 'Plain Node.js', value: 'nodejs' },
       ],
     });
   }
@@ -391,11 +391,11 @@ function getPackageJson(config: ProjectConfig): any {
     name: config.name,
     version: '0.1.0',
     description: `Z402-integrated ${config.type} application`,
-    main: config.language === 'typescript' ? 'dist/index : 'src/index,
+    main: config.language === 'typescript' ? 'dist/index.js' : 'src/index.js',
     scripts: {
-      dev: config.language === 'typescript' ? 'tsx src/index.ts' : 'node src/index,
+      dev: config.language === 'typescript' ? 'tsx src/index.ts' : 'node src/index.js',
       build: config.language === 'typescript' ? 'tsc' : 'echo "No build needed"',
-      start: config.language === 'typescript' ? 'node dist/index : 'node src/index,
+      start: config.language === 'typescript' ? 'node dist/index.js' : 'node src/index.js',
     },
     dependencies: {
       '@z402/sdk': '^0.1.0',
