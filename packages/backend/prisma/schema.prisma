@@ -1,0 +1,421 @@
+// Z402 Database Schema
+// x402 payment facilitator for Zcash
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// MERCHANT MODELS
+// ============================================================================
+
+model Merchant {
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  passwordHash          String
+  name                  String
+
+  // Zcash Addresses
+  zcashAddress          String    @unique // Transparent address (t-addr)
+  zcashShieldedAddress  String?   @unique // Shielded address (z-addr) - optional
+
+  // API Configuration
+  apiKeyHash            String?   @unique
+  webhookUrl            String?
+  webhookSecret         String?
+
+  // Account Status
+  isActive              Boolean   @default(true)
+  isVerified            Boolean   @default(false)
+  verifiedAt            DateTime?
+
+  // Business Information
+  businessName          String?
+  businessType          String?
+  website               String?
+
+  // Settings
+  settings              Json      @default("{}")
+
+  // Timestamps
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  lastLoginAt           DateTime?
+
+  // Relations
+  transactions          Transaction[]
+  apiKeys               ApiKey[]
+  webhookDeliveries     WebhookDelivery[]
+  paymentIntents        PaymentIntent[]
+  analytics             Analytics[]
+
+  @@index([email])
+  @@index([zcashAddress])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("merchants")
+}
+
+// ============================================================================
+// TRANSACTION MODELS
+// ============================================================================
+
+enum TransactionStatus {
+  PENDING     // Payment initiated, waiting for blockchain confirmation
+  VERIFIED    // Transaction seen on blockchain, waiting for confirmations
+  SETTLED     // Transaction confirmed with required confirmations
+  FAILED      // Transaction failed or expired
+  REFUNDED    // Transaction was refunded
+}
+
+model Transaction {
+  id                String              @id @default(cuid())
+  merchantId        String
+
+  // Payment Details
+  amount            Decimal             @db.Decimal(18, 8)
+  currency          String              @default("ZEC")
+  status            TransactionStatus   @default(PENDING)
+
+  // Blockchain Information
+  paymentHash       String?             @unique // x402 payment hash
+  transactionId     String?             @unique // Zcash txid
+  blockHeight       Int?
+  confirmations     Int                 @default(0)
+
+  // x402 Protocol Fields
+  resourceUrl       String              // The resource being paid for
+  clientAddress     String?             // Client's Zcash address
+
+  // Payment Intent
+  paymentIntentId   String?
+
+  // Additional Data
+  metadata          Json?               // Arbitrary merchant metadata
+  internalNotes     String?             // Internal notes (not visible to API)
+
+  // Timestamps
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  settledAt         DateTime?
+  expiresAt         DateTime?
+
+  // Relations
+  merchant          Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  paymentIntent     PaymentIntent?      @relation(fields: [paymentIntentId], references: [id])
+  webhookDeliveries WebhookDelivery[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([transactionId])
+  @@index([paymentHash])
+  @@index([createdAt])
+  @@index([settledAt])
+  @@index([merchantId, status])
+  @@index([merchantId, createdAt])
+  @@map("transactions")
+}
+
+// ============================================================================
+// API KEY MANAGEMENT
+// ============================================================================
+
+model ApiKey {
+  id            String    @id @default(cuid())
+  merchantId    String
+
+  // Key Information
+  name          String    // Friendly name for the key
+  keyHash       String    @unique // Hashed API key
+  keyPrefix     String    // First 8 chars for identification (e.g., "sk_live_")
+
+  // Permissions
+  permissions   Json      @default("[]") // Array of permission strings
+  scopes        Json      @default("[]") // API scopes (read, write, etc.)
+
+  // Status
+  isActive      Boolean   @default(true)
+
+  // Usage Tracking
+  lastUsedAt    DateTime?
+  usageCount    Int       @default(0)
+
+  // Rate Limiting
+  rateLimit     Int?      // Requests per hour (null = default)
+
+  // Expiration
+  expiresAt     DateTime?
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  merchant      Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([merchantId])
+  @@index([keyHash])
+  @@index([keyPrefix])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@map("api_keys")
+}
+
+// ============================================================================
+// WEBHOOK MANAGEMENT
+// ============================================================================
+
+enum WebhookEventType {
+  PAYMENT_CREATED       // New payment intent created
+  PAYMENT_PENDING       // Payment initiated
+  PAYMENT_VERIFIED      // Payment seen on blockchain
+  PAYMENT_SETTLED       // Payment confirmed
+  PAYMENT_FAILED        // Payment failed
+  PAYMENT_REFUNDED      // Payment refunded
+  PAYMENT_EXPIRED       // Payment intent expired
+}
+
+enum WebhookDeliveryStatus {
+  PENDING       // Queued for delivery
+  SENT          // Successfully sent
+  FAILED        // Delivery failed
+  RETRYING      // Being retried
+}
+
+model WebhookDelivery {
+  id                String                  @id @default(cuid())
+  merchantId        String
+  transactionId     String?
+
+  // Event Information
+  eventType         WebhookEventType
+  eventId           String                  @unique @default(cuid()) // Idempotency key
+
+  // Payload
+  payload           Json                    // Complete webhook payload
+
+  // Delivery Status
+  status            WebhookDeliveryStatus   @default(PENDING)
+  httpStatusCode    Int?
+  responseBody      String?
+  errorMessage      String?
+
+  // Retry Logic
+  attempts          Int                     @default(0)
+  maxAttempts       Int                     @default(5)
+  lastAttemptAt     DateTime?
+  nextAttemptAt     DateTime?
+
+  // Timestamps
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  deliveredAt       DateTime?
+
+  // Relations
+  merchant          Merchant                @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  transaction       Transaction?            @relation(fields: [transactionId], references: [id])
+
+  @@index([merchantId])
+  @@index([transactionId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([nextAttemptAt])
+  @@index([merchantId, eventType])
+  @@map("webhook_deliveries")
+}
+
+// ============================================================================
+// PAYMENT INTENT (Pre-payment Sessions)
+// ============================================================================
+
+enum PaymentIntentStatus {
+  CREATED       // Intent created, awaiting payment
+  PROCESSING    // Payment detected, processing
+  SUCCEEDED     // Payment completed successfully
+  EXPIRED       // Intent expired without payment
+  CANCELLED     // Intent cancelled by merchant
+}
+
+model PaymentIntent {
+  id                String              @id @default(cuid())
+  merchantId        String
+
+  // Payment Details
+  amount            Decimal             @db.Decimal(18, 8)
+  currency          String              @default("ZEC")
+
+  // Status
+  status            PaymentIntentStatus @default(CREATED)
+
+  // x402 Resource Information
+  resourceUrl       String              // Resource being paid for
+  resourceType      String?             // Type of resource (api, content, service)
+
+  // Payment Configuration
+  zcashAddress      String              // Address to pay to
+  paymentHash       String?             @unique // Generated payment hash
+
+  // Client Information
+  clientIp          String?
+  clientUserAgent   String?
+
+  // Metadata
+  metadata          Json?               // Merchant-defined metadata
+  description       String?
+
+  // Expiration
+  expiresAt         DateTime
+
+  // Timestamps
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  completedAt       DateTime?
+
+  // Relations
+  merchant          Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+
+  @@index([merchantId])
+  @@index([status])
+  @@index([paymentHash])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@index([merchantId, status])
+  @@map("payment_intents")
+}
+
+// ============================================================================
+// ANALYTICS (TimescaleDB Hypertable)
+// ============================================================================
+
+enum MetricType {
+  PAYMENT_VOLUME        // Total payment volume
+  PAYMENT_COUNT         // Number of payments
+  SUCCESS_RATE          // Success rate percentage
+  AVERAGE_AMOUNT        // Average transaction amount
+  UNIQUE_CLIENTS        // Unique client addresses
+  API_REQUESTS          // API request count
+  WEBHOOK_DELIVERIES    // Webhook delivery count
+  RESPONSE_TIME         // API response time
+}
+
+model Analytics {
+  id            String      @id @default(cuid())
+
+  // Time-series timestamp (partition key for TimescaleDB)
+  timestamp     DateTime    @default(now())
+
+  // Dimensions
+  merchantId    String?
+  metricType    MetricType
+
+  // Metric Value
+  value         Decimal     @db.Decimal(18, 8)
+
+  // Additional Context
+  metadata      Json?       // Additional metric metadata
+  tags          Json?       // Tags for filtering (e.g., {"status": "settled"})
+
+  // Relations
+  merchant      Merchant?   @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@index([timestamp])
+  @@index([merchantId, timestamp])
+  @@index([metricType, timestamp])
+  @@index([merchantId, metricType, timestamp])
+  @@map("analytics")
+}
+
+// ============================================================================
+// REFUND TRACKING
+// ============================================================================
+
+enum RefundStatus {
+  PENDING       // Refund initiated
+  PROCESSING    // Refund being processed
+  COMPLETED     // Refund completed
+  FAILED        // Refund failed
+}
+
+model Refund {
+  id                String        @id @default(cuid())
+  transactionId     String        @unique
+
+  // Refund Details
+  amount            Decimal       @db.Decimal(18, 8)
+  currency          String        @default("ZEC")
+  status            RefundStatus  @default(PENDING)
+
+  // Blockchain Information
+  refundTxid        String?       @unique // Zcash transaction ID for refund
+
+  // Reason
+  reason            String?
+  internalNotes     String?
+
+  // Timestamps
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  completedAt       DateTime?
+
+  @@index([transactionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("refunds")
+}
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  API_KEY_CREATED
+  API_KEY_REVOKED
+  WEBHOOK_CONFIGURED
+  PAYMENT_CREATED
+  PAYMENT_SETTLED
+  REFUND_ISSUED
+}
+
+model AuditLog {
+  id            String      @id @default(cuid())
+
+  // Actor Information
+  merchantId    String?
+  apiKeyId      String?
+
+  // Action Details
+  action        AuditAction
+  resourceType  String      // e.g., "Transaction", "ApiKey", "Merchant"
+  resourceId    String?
+
+  // Request Context
+  ipAddress     String?
+  userAgent     String?
+
+  // Changes
+  changes       Json?       // Before/after values for updates
+  metadata      Json?       // Additional context
+
+  // Timestamp
+  createdAt     DateTime    @default(now())
+
+  @@index([merchantId])
+  @@index([action])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@index([merchantId, createdAt])
+  @@map("audit_logs")
+}

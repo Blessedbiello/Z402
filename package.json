@@ -1,0 +1,66 @@
+{
+  "name": "z402",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Z402 - x402 payment facilitator for Zcash with Stripe-like developer experience",
+  "author": "Z402 Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --stream dev",
+    "dev:backend": "pnpm --filter @z402/backend dev",
+    "dev:frontend": "pnpm --filter @z402/frontend dev",
+    "build": "pnpm --recursive --stream build",
+    "build:backend": "pnpm --filter @z402/backend build",
+    "build:frontend": "pnpm --filter @z402/frontend build",
+    "build:sdk": "pnpm --filter @z402/sdk build",
+    "test": "pnpm --recursive --stream test",
+    "test:watch": "pnpm --recursive --parallel test:watch",
+    "lint": "pnpm --recursive --stream lint",
+    "lint:fix": "pnpm --recursive --stream lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "type-check": "pnpm --recursive --stream type-check",
+    "clean": "pnpm --recursive --parallel clean && rm -rf node_modules",
+    "db:generate": "pnpm --filter @z402/backend db:generate",
+    "db:push": "pnpm --filter @z402/backend db:push",
+    "db:migrate": "pnpm --filter @z402/backend db:migrate",
+    "db:studio": "pnpm --filter @z402/backend db:studio",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:clean": "docker-compose down -v",
+    "setup": "pnpm install && pnpm db:generate",
+    "prepare": "husky install || true"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-prettier": "^5.1.3",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.2",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "^5.3.3"
+    }
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

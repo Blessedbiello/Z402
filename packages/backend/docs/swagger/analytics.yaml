@@ -1,0 +1,262 @@
+paths:
+  /analytics/overview:
+    get:
+      tags:
+        - Analytics
+      summary: Get dashboard overview
+      description: Retrieve high-level statistics for the merchant dashboard
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [24h, 7d, 30d, 90d, 1y, all]
+            default: 30d
+          description: Time period for statistics
+      responses:
+        '200':
+          description: Overview statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  overview:
+                    type: object
+                    properties:
+                      revenue:
+                        type: object
+                        properties:
+                          total:
+                            type: number
+                            example: 125.5
+                          currency:
+                            type: string
+                            example: ZEC
+                          growth:
+                            type: number
+                            description: Percentage growth compared to previous period
+                            example: 15.3
+                      transactions:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                            example: 1000
+                          successful:
+                            type: integer
+                            example: 850
+                          successRate:
+                            type: number
+                            example: 85.0
+                          growth:
+                            type: number
+                            example: 10.5
+                      averageValue:
+                        type: object
+                        properties:
+                          amount:
+                            type: number
+                            example: 0.125
+                          currency:
+                            type: string
+                            example: ZEC
+                      topResource:
+                        type: object
+                        nullable: true
+                        properties:
+                          url:
+                            type: string
+                            example: https://api.example.com/premium
+                          revenue:
+                            type: number
+                            example: 50.0
+                          count:
+                            type: integer
+                            example: 400
+                      recentTransactions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Transaction'
+                  period:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        example: 30d
+                      startDate:
+                        type: string
+                        format: date-time
+                      endDate:
+                        type: string
+                        format: date-time
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /analytics/revenue:
+    get:
+      tags:
+        - Analytics
+      summary: Get revenue over time
+      description: Retrieve revenue data aggregated by time interval
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Start date (defaults to 30 days ago)
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: End date (defaults to now)
+        - name: interval
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: day
+          description: Time interval for aggregation
+        - name: currency
+          in: query
+          schema:
+            type: string
+            default: ZEC
+          description: Currency filter
+      responses:
+        '200':
+          description: Revenue data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  revenue:
+                    type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            time:
+                              type: string
+                              example: "2024-01-15"
+                            revenue:
+                              type: number
+                              example: 10.5
+                            count:
+                              type: integer
+                              example: 85
+                      total:
+                        type: number
+                        example: 125.5
+                      average:
+                        type: number
+                        example: 4.18
+                      currency:
+                        type: string
+                        example: ZEC
+                  period:
+                    type: object
+                    properties:
+                      startDate:
+                        type: string
+                        format: date-time
+                      endDate:
+                        type: string
+                        format: date-time
+                      interval:
+                        type: string
+                        example: day
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /analytics/top-resources:
+    get:
+      tags:
+        - Analytics
+      summary: Get most accessed resources
+      description: Retrieve top resources by revenue or access count
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [24h, 7d, 30d, 90d, 1y, all]
+            default: 30d
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+          description: Number of resources to return
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [count, revenue]
+            default: revenue
+          description: Sort by count or revenue
+      responses:
+        '200':
+          description: Top resources retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  resources:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        url:
+                          type: string
+                          example: https://api.example.com/premium
+                        revenue:
+                          type: number
+                          example: 50.0
+                        count:
+                          type: integer
+                          example: 400
+                        revenuePercentage:
+                          type: number
+                          example: 40.0
+                        countPercentage:
+                          type: number
+                          example: 35.0
+                  total:
+                    type: object
+                    properties:
+                      revenue:
+                        type: number
+                        example: 125.0
+                      count:
+                        type: integer
+                        example: 1150
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'

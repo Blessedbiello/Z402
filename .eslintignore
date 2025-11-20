@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+.next
+coverage
+*.config.js
+*.config.ts
+.eslintrc.js
+jest.config.js

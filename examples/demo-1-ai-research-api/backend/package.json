@@ -1,0 +1,28 @@
+{
+  "name": "demo-ai-research-api-backend",
+  "version": "1.0.0",
+  "description": "AI Research API protected by Z402 - Backend",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "docker:build": "docker build -t z402-demo-ai-api .",
+    "docker:run": "docker run -p 3000:3000 --env-file .env z402-demo-ai-api"
+  },
+  "dependencies": {
+    "@z402/sdk": "^0.1.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.11.16",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
