@@ -1,8 +1,8 @@
 import axios from 'axios';
-import crypto from 'crypto';
 import { logger } from '../config/logger';
 import prisma from '../db';
 import { WebhookEventType } from '@prisma/client';
+import { generateWebhookSignature } from '../middleware/webhook-signature';
 
 /**
  * Webhook Service
@@ -83,8 +83,8 @@ export class WebhookService {
         attempt: attemptNumber + 1,
       });
 
-      // Generate signature
-      const signature = this.generateSignature(payload, secret);
+      // Generate signature with timestamp
+      const signature = generateWebhookSignature(payload, secret);
 
       // Send webhook
       const response = await axios.post(url, payload, {
@@ -167,31 +167,6 @@ export class WebhookService {
     }
   }
 
-  /**
-   * Generate webhook signature
-   */
-  private static generateSignature(
-    payload: Record<string, unknown>,
-    secret: string
-  ): string {
-    const body = JSON.stringify(payload);
-    return crypto.createHmac('sha256', secret).update(body).digest('hex');
-  }
-
-  /**
-   * Verify webhook signature
-   */
-  static verifySignature(
-    payload: Record<string, unknown>,
-    signature: string,
-    secret: string
-  ): boolean {
-    const expectedSignature = this.generateSignature(payload, secret);
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
-  }
 
   /**
    * Retry failed webhooks
