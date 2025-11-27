@@ -1,5 +1,3 @@
-import { PrismaClient } from '@prisma/client';
-
 // Mock environment variables for testing
 // NOTE: These are intentionally hardcoded test values and pose no security risk.
 // They are only used in isolated test environments and never in production.
@@ -7,6 +5,11 @@ import { PrismaClient } from '@prisma/client';
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/z402_test';
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
+process.env.API_KEY_ENCRYPTION_KEY = 'test-encryption-key-32-chars-long!';
+process.env.ZCASH_NETWORK = 'testnet';
+process.env.ZCASH_RPC_URL = 'http://localhost:18232';
+process.env.ZCASH_RPC_USER = 'test';
+process.env.ZCASH_RPC_PASSWORD = 'test';
 process.env.NODE_ENV = 'test';
 
 // Global test timeout
