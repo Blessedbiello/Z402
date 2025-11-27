@@ -11,10 +11,17 @@
 import { ZcashCryptoService } from '../zcash-crypto.service';
 
 describe('ZcashCryptoService', () => {
+  // Real Zcash testnet addresses for testing (publicly known, no private keys)
+  const TEST_ADDRESSES = {
+    mainnetP2PKH: 't1Hsc1LR8yKnbbe3twRp88p6vFfC5t7DLbs', // Real mainnet address
+    mainnetP2SH: 't3LmX1cxWPPPqL4TZHx42HU3U5ghbFjRiif', // Real mainnet P2SH
+    testnetP2PKH: 'tmYXBYJj1K7vhejSec5osXK2QsGa5MTisUQ', // Real testnet address
+  };
+
   describe('Address Validation', () => {
     describe('validateAddress - Transparent Addresses', () => {
       it('should validate mainnet transparent P2PKH address (t1)', () => {
-        const address = 't1Uzd4rAfHhL8gwHxfzQc8iJESLNKjPdmNY';
+        const address = TEST_ADDRESSES.mainnetP2PKH;
         const result = ZcashCryptoService.validateAddress(address);
 
         expect(result.type).toBe('transparent');
@@ -25,7 +32,7 @@ describe('ZcashCryptoService', () => {
       });
 
       it('should validate mainnet transparent P2SH address (t3)', () => {
-        const address = 't3Vz22vK5z2LcKEdg16Yv4FFneEL1zg9ojd';
+        const address = TEST_ADDRESSES.mainnetP2SH;
         const result = ZcashCryptoService.validateAddress(address);
 
         expect(result.type).toBe('transparent');
@@ -34,7 +41,7 @@ describe('ZcashCryptoService', () => {
       });
 
       it('should validate testnet transparent address (tm)', () => {
-        const address = 'tmBsTi2xWTjUdEXnuTceL7fecEQKeWaPDJd';
+        const address = TEST_ADDRESSES.testnetP2PKH;
         const result = ZcashCryptoService.validateAddress(address);
 
         expect(result.type).toBe('transparent');
@@ -125,7 +132,7 @@ describe('ZcashCryptoService', () => {
       });
 
       it('should reject signature with invalid length', async () => {
-        const address = 't1Uzd4rAfHhL8gwHxfzQc8iJESLNKjPdmNY';
+        const address = TEST_ADDRESSES.testnetP2PKH;
         const invalidSignature = '00'.repeat(32); // Too short
 
         const result = await ZcashCryptoService.verifyTransparentSignature(
@@ -139,7 +146,7 @@ describe('ZcashCryptoService', () => {
       });
 
       it('should reject signature with invalid format', async () => {
-        const address = 't1Uzd4rAfHhL8gwHxfzQc8iJESLNKjPdmNY';
+        const address = TEST_ADDRESSES.testnetP2PKH;
         const invalidSignature = 'not-a-hex-string';
 
         const result = await ZcashCryptoService.verifyTransparentSignature(
@@ -156,13 +163,14 @@ describe('ZcashCryptoService', () => {
         const invalidAddress = 't1InvalidAddress123';
         const signature = '00'.repeat(65);
 
-        await expect(
-          ZcashCryptoService.verifyTransparentSignature(
-            testMessage,
-            signature,
-            invalidAddress
-          )
-        ).rejects.toThrow();
+        const result = await ZcashCryptoService.verifyTransparentSignature(
+          testMessage,
+          signature,
+          invalidAddress
+        );
+
+        expect(result.valid).toBe(false);
+        expect(result.error).toBeDefined();
       });
 
       // Integration test - requires real signature generation
@@ -194,7 +202,7 @@ describe('ZcashCryptoService', () => {
       it('should create deterministic challenge string', () => {
         const paymentIntentId = 'payment_123';
         const amount = '0.01';
-        const merchantAddress = 't1Uzd4rAfHhL8gwHxfzQc8iJESLNKjPdmNY';
+        const merchantAddress = TEST_ADDRESSES.testnetP2PKH;
         const timestamp = 1700000000000;
 
         const challenge = ZcashCryptoService.createChallenge(
@@ -319,14 +327,14 @@ describe('ZcashCryptoService', () => {
         const challenge = ZcashCryptoService.createChallenge(
           'payment_123',
           '0.01',
-          't1Uzd4rAfHhL8gwHxfzQc8iJESLNKjPdmNY',
+          TEST_ADDRESSES.testnetP2PKH,
           recentTimestamp
         );
 
         const result = await ZcashCryptoService.verifyX402Authorization(
           challenge,
           '00'.repeat(65),
-          't1Uzd4rAfHhL8gwHxfzQc8iJESLNKjPdmNY'
+          TEST_ADDRESSES.testnetP2PKH
         );
 
         // Will fail signature verification, but should pass expiration check
@@ -480,13 +488,14 @@ describe('ZcashCryptoService', () => {
       const invalidAddress = 'not-an-address';
       const signature = '00'.repeat(65);
 
-      await expect(
-        ZcashCryptoService.verifyTransparentSignature(
-          'test',
-          signature,
-          invalidAddress
-        )
-      ).rejects.toThrow();
+      const result = await ZcashCryptoService.verifyTransparentSignature(
+        'test',
+        signature,
+        invalidAddress
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toBeDefined();
     });
   });
 
