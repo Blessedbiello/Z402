@@ -10,7 +10,7 @@
  * with proper Zcash cryptographic signatures.
  */
 
-import * as secp256k1 from '@noble/secp256k1';
+import * as secp256k1 from 'secp256k1';
 import bs58check from 'bs58check';
 import crypto from 'crypto';
 import { logger } from '../config/logger';
@@ -148,16 +148,14 @@ export class ZcashCryptoService {
    * Verifies a signature for a transparent Zcash address
    *
    * @param message - The original message that was signed
-   * @param signature - The signature in hex format (64 bytes compact or 65 bytes with recovery)
+   * @param signature - The signature in hex format (65 bytes: recovery ID + r + s)
    * @param address - The Zcash transparent address that allegedly signed the message
-   * @param publicKey - Optional: The public key in hex format (improves verification speed)
    * @returns Verification result with validity and details
    */
   static async verifyTransparentSignature(
     message: string,
     signature: string,
-    address: string,
-    publicKey?: string
+    address: string
   ): Promise<SignatureVerificationResult> {
     try {
       // Validate the address
@@ -201,44 +199,57 @@ export class ZcashCryptoService {
       const compactSig = Buffer.concat([r, s]);
 
       try {
-        // Note: @noble/secp256k1 v3.x doesn't support recovery directly
-        // We'll try all possible public keys and see which one matches the address
-        // This is less efficient but works without recovery support
+        // Recover the public key from the signature using native secp256k1
+        const recoveredPublicKey = secp256k1.ecdsaRecover(
+          compactSig,
+          recoveryId,
+          messageHash,
+          false // uncompressed format
+        );
 
-        // Try to verify the signature by deriving the address
-        // First, let's use the signature verification with the address's public key
+        // Verify the signature with the recovered public key
+        const isValid = secp256k1.ecdsaVerify(
+          compactSig,
+          messageHash,
+          recoveredPublicKey
+        );
 
-        // For now, we'll implement a simpler verification:
-        // We cannot recover the public key with this version of the library,
-        // so we'll need the client to also provide their public key
-        // OR we verify against the known address
+        if (!isValid) {
+          return {
+            valid: false,
+            error: 'Signature verification failed',
+          };
+        }
 
-        // Since we don't have the public key, we'll return an error for now
-        // and implement full verification in a future iteration with proper library
+        // Derive the address from the recovered public key
+        const derivedAddress = this.publicKeyToAddress(
+          Buffer.from(recoveredPublicKey),
+          addressInfo.network
+        );
 
+        // Verify that the derived address matches the claimed address
+        if (derivedAddress !== address) {
+          return {
+            valid: false,
+            error: 'Signature is valid but does not match the claimed address',
+          };
+        }
+
+        // All checks passed
         return {
-          valid: false,
-          error: 'Signature verification with address recovery not yet implemented. Client must provide public key.',
+          valid: true,
+          address,
+          message,
         };
-
-        // TODO: Implement one of these solutions:
-        // 1. Upgrade to a library that supports public key recovery with recovery ID
-        // 2. Require clients to send their public key along with signature
-        // 3. Use zcash-cli for verification (requires node)
       } catch (verifyError) {
+        logger.error('Signature verification error:', verifyError);
         return {
           valid: false,
           error: `Signature verification error: ${verifyError instanceof Error ? verifyError.message : 'unknown'}`,
         };
       }
-
-      return {
-        valid: true,
-        address,
-        message,
-      };
     } catch (error) {
-      logger.error('Signature verification error:', error);
+      logger.error('Address validation or parsing error:', error);
       return {
         valid: false,
         error: `Verification failed: ${error instanceof Error ? error.message : 'unknown error'}`,
