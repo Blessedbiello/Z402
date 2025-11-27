@@ -74,11 +74,18 @@ enum TransactionStatus {
   REFUNDED    // Transaction was refunded
 }
 
+enum TransactionType {
+  PAYMENT     // Incoming payment
+  REFUND      // Outgoing refund
+  SETTLEMENT  // Settlement transaction
+}
+
 model Transaction {
   id                String              @id @default(cuid())
   merchantId        String
 
   // Payment Details
+  type              TransactionType     @default(PAYMENT)
   amount            Decimal             @db.Decimal(18, 8)
   currency          String              @default("ZEC")
   status            TransactionStatus   @default(PENDING)
@@ -262,6 +269,10 @@ model PaymentIntent {
   zcashAddress      String              // Address to pay to
   paymentHash       String?             @unique // Generated payment hash
 
+  // Transaction Information
+  transactionId     String?             @unique // Zcash transaction ID
+  clientAddress     String?             // Client's Zcash address
+
   // Client Information
   clientIp          String?
   clientUserAgent   String?
@@ -270,12 +281,19 @@ model PaymentIntent {
   metadata          Json?               // Merchant-defined metadata
   description       String?
 
+  // Refund Information
+  refundedAt        DateTime?
+  refundReason      String?
+  refundAmount      Decimal?            @db.Decimal(18, 8)
+
   // Expiration
   expiresAt         DateTime
 
   // Timestamps
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
+  paidAt            DateTime?           // When payment was submitted
+  verifiedAt        DateTime?           // When payment was verified on blockchain
   completedAt       DateTime?
 
   // Relations
@@ -285,6 +303,7 @@ model PaymentIntent {
   @@index([merchantId])
   @@index([status])
   @@index([paymentHash])
+  @@index([transactionId])
   @@index([expiresAt])
   @@index([createdAt])
   @@index([merchantId, status])

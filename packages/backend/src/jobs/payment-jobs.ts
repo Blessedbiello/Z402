@@ -2,12 +2,13 @@ import { CronJob } from 'cron';
 import { SettlementService } from '../services/settle.service';
 import { VerificationService } from '../services/verify.service';
 import { WebhookService } from '../services/webhook.service';
+import { blockchainMonitor } from '../services/blockchain-monitor.service';
 import { apikeyQueries } from '../db/queries';
 import { logger } from '../config/logger';
 
 /**
  * Scheduled Payment Jobs
- * Handles automatic settlement, verification, and cleanup
+ * Handles automatic settlement, verification, cleanup, and blockchain monitoring
  */
 
 export class PaymentJobs {
@@ -16,8 +17,42 @@ export class PaymentJobs {
   /**
    * Start all payment jobs
    */
-  start(): void {
+  async start(): Promise<void> {
     logger.info('Starting payment jobs...');
+
+    // Start blockchain monitoring service
+    try {
+      await blockchainMonitor.start();
+      logger.info('Blockchain monitor started successfully');
+
+      // Set up event listeners for blockchain monitor
+      blockchainMonitor.on('payment_detected', (match) => {
+        logger.info('Payment detected on blockchain', {
+          paymentIntentId: match.paymentIntentId,
+          txid: match.txid,
+          confirmations: match.confirmations,
+        });
+      });
+
+      blockchainMonitor.on('payment_confirmed', (match) => {
+        logger.info('Payment confirmed on blockchain', {
+          paymentIntentId: match.paymentIntentId,
+          txid: match.txid,
+          confirmations: match.confirmations,
+        });
+      });
+
+      blockchainMonitor.on('transaction_lost', (txid) => {
+        logger.error('Transaction lost in blockchain reorganization', { txid });
+      });
+
+      blockchainMonitor.on('error', (error) => {
+        logger.error('Blockchain monitor error:', error);
+      });
+    } catch (error) {
+      logger.error('Failed to start blockchain monitor:', error);
+      // Continue with other jobs even if blockchain monitor fails
+    }
 
     // Auto-settle verified transactions (every 5 minutes)
     this.jobs.push(
@@ -95,6 +130,16 @@ export class PaymentJobs {
    */
   stop(): void {
     logger.info('Stopping payment jobs...');
+
+    // Stop blockchain monitor
+    try {
+      blockchainMonitor.stop();
+      logger.info('Blockchain monitor stopped');
+    } catch (error) {
+      logger.error('Failed to stop blockchain monitor:', error);
+    }
+
+    // Stop cron jobs
     this.jobs.forEach((job) => job.stop());
     this.jobs = [];
     logger.info('All payment jobs stopped');
@@ -106,10 +151,22 @@ export class PaymentJobs {
   getStatus(): {
     running: boolean;
     jobCount: number;
+    blockchainMonitor: {
+      isMonitoring: boolean;
+      lastScannedBlock: number;
+      processedTransactions: number;
+    };
   } {
+    const monitorStatus = blockchainMonitor.getStatus();
+
     return {
       running: this.jobs.length > 0 && this.jobs[0].running,
       jobCount: this.jobs.length,
+      blockchainMonitor: {
+        isMonitoring: monitorStatus.isMonitoring,
+        lastScannedBlock: monitorStatus.lastScannedBlock,
+        processedTransactions: monitorStatus.processedTransactions,
+      },
     };
   }
 }
