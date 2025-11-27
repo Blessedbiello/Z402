@@ -15,7 +15,6 @@
     "fumadocs-core": "^13.0.0",
     "fumadocs-ui": "^13.0.0",
     "fumadocs-mdx": "^10.0.0",
-    "@fumadocs/openapi": "^5.0.0",
     "shiki": "^1.0.0",
     "lucide-react": "^0.365.0",
     "class-variance-authority": "^0.7.0",

@@ -20,7 +20,7 @@ export const config = {
 
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+    secret: process.env.JWT_SECRET as string, // Required - no fallback for security
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
 
@@ -40,7 +40,7 @@ export const config = {
 
   // API Keys
   apiKeys: {
-    encryptionKey: process.env.API_KEY_ENCRYPTION_KEY || '',
+    encryptionKey: process.env.API_KEY_ENCRYPTION_KEY as string, // Required - no fallback for security
   },
 
   // Rate Limiting

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { logger } from '../config/logger';
 import prisma from '../db';
+import { ZcashCryptoService } from '../services/zcash-crypto.service';
 
 /**
  * X402 Protocol Implementation
@@ -91,18 +92,17 @@ export class X402Protocol {
         },
       });
 
-      // Generate signature for challenge
-      const challengeData = {
-        paymentId: paymentIntent.id,
-        amount: request.amount,
-        currency: 'ZEC',
+      // Create challenge string for client to sign with their Zcash private key
+      // Note: The signature field here is the challenge string itself, not a server signature
+      // The client must sign this challenge with their private key
+      const challengeString = ZcashCryptoService.createChallenge(
+        paymentIntent.id,
+        request.amount.toString(),
         merchantAddress,
-        resourceUrl: request.resourceUrl,
-        expiresAt: expiresAt.toISOString(),
-        nonce,
-      };
+        Date.now()
+      );
 
-      const signature = this.signChallenge(challengeData);
+      const signature = challengeString; // This will be signed by the client
 
       logger.info('X402 challenge generated', {
         paymentId: paymentIntent.id,
@@ -167,16 +167,30 @@ export class X402Protocol {
         };
       }
 
-      // Verify signature
-      const signatureValid = this.verifySignature(
-        authorization,
-        paymentIntent.paymentHash || ''
+      // Verify Zcash cryptographic signature
+      // The client should have signed the challenge with their private key
+      const challengeString = ZcashCryptoService.createChallenge(
+        paymentIntent.id,
+        paymentIntent.amount.toString(),
+        paymentIntent.zcashAddress,
+        paymentIntent.createdAt.getTime()
       );
 
-      if (!signatureValid) {
+      const signatureVerification = await ZcashCryptoService.verifyX402Authorization(
+        challengeString,
+        authorization.signature,
+        authorization.clientAddress
+      );
+
+      if (!signatureVerification.valid) {
+        logger.warn('X402 signature verification failed', {
+          paymentId: authorization.paymentId,
+          clientAddress: authorization.clientAddress,
+          error: signatureVerification.error,
+        });
         return {
           valid: false,
-          error: 'Invalid signature',
+          error: signatureVerification.error || 'Invalid signature',
         };
       }
 
@@ -312,59 +326,12 @@ export class X402Protocol {
   }
 
   /**
-   * Sign challenge data
+   * DEPRECATED: Old HMAC-based methods removed
+   * Now using proper Zcash cryptographic signatures via ZcashCryptoService
+   *
+   * Security: Signatures are now verified using ECDSA (secp256k1) for transparent addresses,
+   * proving that the client controls the private key for their claimed Zcash address.
    */
-  private static signChallenge(data: Record<string, unknown>): string {
-    const message = JSON.stringify(data);
-    // In production, use merchant's private key for signing
-    // For now, use HMAC with server secret
-    const secret = process.env.CHALLENGE_SIGNING_SECRET || 'change-me-in-production';
-    return crypto.createHmac('sha256', secret).update(message).digest('hex');
-  }
-
-  /**
-   * Verify authorization signature
-   */
-  private static verifySignature(
-    authorization: X402Authorization,
-    nonce: string
-  ): boolean {
-    try {
-      // Verify timestamp (within 5 minutes)
-      const timeDiff = Math.abs(Date.now() - authorization.timestamp);
-      if (timeDiff > 5 * 60 * 1000) {
-        logger.warn('Authorization timestamp too old', {
-          timeDiff,
-          paymentId: authorization.paymentId,
-        });
-        return false;
-      }
-
-      // Reconstruct signature data
-      const signatureData = [
-        authorization.paymentId,
-        authorization.clientAddress,
-        authorization.timestamp,
-        nonce,
-      ].join('|');
-
-      // In production, verify with client's public key
-      // For now, verify HMAC
-      const secret = process.env.CHALLENGE_SIGNING_SECRET || 'change-me-in-production';
-      const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(signatureData)
-        .digest('hex');
-
-      return crypto.timingSafeEqual(
-        Buffer.from(authorization.signature),
-        Buffer.from(expectedSignature)
-      );
-    } catch (error) {
-      logger.error('Signature verification failed', error);
-      return false;
-    }
-  }
 
   /**
    * Check payment status
@@ -400,24 +367,21 @@ export class X402Protocol {
   }
 
   /**
-   * Generate payment proof (for client)
+   * Generate payment proof hash (for verification without exposing details)
+   * Note: The actual payment proof with signature should be generated client-side
+   * using the client's Zcash private key
    */
-  static generatePaymentProof(
-    paymentId: string,
-    clientAddress: string,
-    nonce: string
+  static generatePaymentProofHash(
+    transactionId: string,
+    amount: string,
+    fromAddress: string,
+    toAddress: string
   ): string {
-    const timestamp = Date.now();
-    const signatureData = [paymentId, clientAddress, timestamp, nonce].join(
-      '|'
+    return ZcashCryptoService.generatePaymentProof(
+      transactionId,
+      amount,
+      fromAddress,
+      toAddress
     );
-
-    const secret = process.env.CHALLENGE_SIGNING_SECRET || 'change-me-in-production';
-    const signature = crypto
-      .createHmac('sha256', secret)
-      .update(signatureData)
-      .digest('hex');
-
-    return `X402 paymentId="${paymentId}", clientAddress="${clientAddress}", signature="${signature}", timestamp="${timestamp}"`;
   }
 }
