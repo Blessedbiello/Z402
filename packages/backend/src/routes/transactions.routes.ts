@@ -7,7 +7,6 @@ import {
   refundTransactionSchema,
   exportTransactionsSchema,
 } from '../validators/transaction.validators';
-import { transactionQueries } from '../db/queries';
 import prisma from '../db';
 import { Prisma } from '@prisma/client';
 

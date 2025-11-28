@@ -40,7 +40,7 @@ const createApiKeySchema = z.object({
  * POST /api/v1/merchants/register
  * Register a new merchant
  */
-router.post('/register', async (req, res: Response, next: NextFunction) => {
+router.post('/register', async (req, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Validate request body
     const validatedData = registerSchema.parse(req.body);
@@ -78,7 +78,7 @@ router.post('/register', async (req, res: Response, next: NextFunction) => {
  * GET /api/v1/merchants/profile
  * Get merchant profile
  */
-router.get('/profile', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/profile', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const merchant = await prisma.merchant.findUnique({
       where: { id: req.user!.id },
@@ -151,7 +151,7 @@ router.get('/profile', authenticate, async (req: AuthRequest, res: Response, nex
  * PUT /api/v1/merchants/profile
  * Update merchant profile
  */
-router.put('/profile', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.put('/profile', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Validate request body
     const validatedData = updateProfileSchema.parse(req.body);
@@ -242,7 +242,7 @@ router.get('/api-keys', authenticate, async (req: AuthRequest, res: Response, ne
  * POST /api/v1/merchants/api-keys
  * Generate a new API key
  */
-router.post('/api-keys', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/api-keys', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Validate request body
     const validatedData = createApiKeySchema.parse(req.body);
@@ -309,7 +309,7 @@ router.post('/api-keys', authenticate, async (req: AuthRequest, res: Response, n
  * DELETE /api/v1/merchants/api-keys/:keyId
  * Revoke an API key
  */
-router.delete('/api-keys/:keyId', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.delete('/api-keys/:keyId', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { keyId } = req.params;
 

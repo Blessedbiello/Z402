@@ -145,10 +145,6 @@ export class VerificationService {
         };
       }
 
-      // Verify recipient address
-      const merchantAddress = dbTransaction.merchant.zcashShieldedAddress ||
-        dbTransaction.merchant.zcashAddress;
-
       // For shielded transactions, we can't verify the recipient address
       // We rely on the merchant confirming they received it
 
@@ -363,7 +359,7 @@ export class VerificationService {
       });
 
       const results = await this.batchVerify(
-        transactions.map((tx) => tx.id)
+        transactions.map((tx: { id: string }) => tx.id)
       );
 
       const verified = results.filter((r) => r.verified).length;

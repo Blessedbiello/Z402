@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { X402Protocol, X402PaymentRequest } from '../core/x402-protocol';
+import { X402Protocol } from '../core/x402-protocol';
 import { VerificationService } from '../services/verify.service';
 import { logger } from '../config/logger';
 import { apikeyQueries } from '../db/queries';

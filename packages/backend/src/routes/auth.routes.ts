@@ -136,7 +136,7 @@ router.post(
   validate(requestPasswordResetSchema),
   async (req: Request, res: Response) => {
     try {
-      const result = await AuthService.requestPasswordReset(req.body.email);
+      await AuthService.requestPasswordReset(req.body.email);
 
       // Always return success to prevent email enumeration
       res.status(200).json({

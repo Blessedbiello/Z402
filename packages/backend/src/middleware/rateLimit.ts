@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Redis } from 'ioredis';
-import config from '../config';
+import { config } from '../config';
 
 // Initialize Redis client for rate limiting
 const redis = new Redis({

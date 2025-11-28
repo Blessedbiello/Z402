@@ -1,9 +1,8 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { X402Protocol } from '../core/x402-protocol';
 import { VerificationService } from '../services/verify.service';
-import { SettlementService } from '../services/settle.service';
 import prisma from '../db';
 import { logger } from '../config/logger';
 import { Prisma } from '@prisma/client';
@@ -47,7 +46,7 @@ const refundPaymentSchema = z.object({
  * POST /api/v1/payments/intents
  * Create a new payment intent
  */
-router.post('/intents', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/intents', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Validate request body
     const validatedData = createPaymentIntentSchema.parse(req.body);
@@ -92,7 +91,7 @@ router.post('/intents', authenticate, async (req: AuthRequest, res: Response, ne
  * GET /api/v1/payments/intents/:id
  * Get payment intent details
  */
-router.get('/intents/:id', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/intents/:id', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -145,7 +144,7 @@ router.get('/intents/:id', authenticate, async (req: AuthRequest, res: Response,
  * POST /api/v1/payments/intents/:id/pay
  * Mark payment intent as paid (submit transaction ID)
  */
-router.post('/intents/:id/pay', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/intents/:id/pay', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -232,7 +231,7 @@ router.post('/intents/:id/pay', authenticate, async (req: AuthRequest, res: Resp
  * POST /api/v1/payments/intents/:id/verify
  * Manually verify a payment
  */
-router.post('/intents/:id/verify', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/intents/:id/verify', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -299,7 +298,7 @@ router.post('/intents/:id/verify', authenticate, async (req: AuthRequest, res: R
  * GET /api/v1/payments
  * List payments for the authenticated merchant
  */
-router.get('/', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const {
       status,
@@ -372,7 +371,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response, next: Next
  * GET /api/v1/payments/:paymentId
  * Get payment details (alias for /intents/:id for backward compatibility)
  */
-router.get('/:paymentId', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:paymentId', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { paymentId } = req.params;
 
@@ -427,7 +426,7 @@ router.get('/:paymentId', authenticate, async (req: AuthRequest, res: Response, 
  * POST /api/v1/payments/:paymentId/refund
  * Refund a payment
  */
-router.post('/:paymentId/refund', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/:paymentId/refund', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { paymentId } = req.params;
 

@@ -32,7 +32,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -52,7 +52,7 @@ app.use(
 );
 
 // Swagger JSON endpoint
-app.get('/api/v1/docs.json', (req, res) => {
+app.get('/api/v1/docs.json', (_req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });

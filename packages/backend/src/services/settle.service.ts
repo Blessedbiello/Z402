@@ -135,7 +135,7 @@ export class SettlementService {
       }
 
       // Settle the transaction
-      const settledTransaction = await this.finalizeSettlement(
+      await this.finalizeSettlement(
         transaction.id,
         zcashTx.confirmations,
         zcashTx.blockHeight

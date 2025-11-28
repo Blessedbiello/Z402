@@ -858,7 +858,7 @@ router.get('/payment-methods', validate(getPaymentMethodsSchema), async (req: Re
 router.get('/customers', validate(getCustomerMetricsSchema), async (req: Request, res: Response) => {
   try {
     const merchantId = (req as any).user.id;
-    const { period, metric } = req.query as any;
+    const { period } = req.query as any;
 
     const { startDate, endDate } = getDateRangeFromPeriod(period);
 

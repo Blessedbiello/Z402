@@ -12,7 +12,6 @@ import {
   apiRateLimit,
   authRateLimit,
   analyticsRateLimit,
-  exportRateLimit,
   webhookTestRateLimit,
   apiKeyCreationRateLimit,
 } from '../middleware/rateLimit';
@@ -35,7 +34,7 @@ router.use('/webhook-management', webhookTestRateLimit, webhookManagementRouter)
 router.use('/analytics', analyticsRateLimit, analyticsRouter);
 
 // API Info
-router.get('/', (req, res) => {
+router.get('/', (_req, res) => {
   res.json({
     name: 'Z402 API',
     version: '1.0.0',

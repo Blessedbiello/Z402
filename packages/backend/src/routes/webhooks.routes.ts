@@ -34,7 +34,7 @@ const configureWebhookSchema = z.object({
  * GET /api/v1/webhooks
  * Get webhook configuration for authenticated merchant
  */
-router.get('/', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const merchant = await prisma.merchant.findUnique({
       where: { id: req.user!.id },
@@ -73,7 +73,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response, next: Next
  * POST /api/v1/webhooks
  * Create or update webhook configuration
  */
-router.post('/', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const validatedData = configureWebhookSchema.parse(req.body);
 
@@ -153,7 +153,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response, next: Nex
  * GET /api/v1/webhooks/:webhookId
  * Get webhook delivery details
  */
-router.get('/:webhookId', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.get('/:webhookId', authenticate, async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { webhookId } = req.params;
 
@@ -248,7 +248,7 @@ router.delete('/:webhookId', authenticate, async (req: AuthRequest, res: Respons
  * Webhook endpoint for receiving Zcash blockchain notifications
  * This endpoint receives notifications from Zcash node or blockchain monitoring service
  */
-router.post('/zcash/notify', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/zcash/notify', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Validate notification payload
     const validatedData = zcashNotificationSchema.parse(req.body);

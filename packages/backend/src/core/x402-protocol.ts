@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { logger } from '../config/logger';
 import prisma from '../db';
 import { ZcashCryptoService } from '../services/zcash-crypto.service';
@@ -81,7 +81,7 @@ export class X402Protocol {
       const paymentIntent = await prisma.paymentIntent.create({
         data: {
           merchantId: request.merchantId,
-          amount: new Prisma.Decimal(request.amount),
+          amount: new Decimal(request.amount),
           currency: 'ZEC',
           status: 'CREATED',
           resourceUrl: request.resourceUrl,

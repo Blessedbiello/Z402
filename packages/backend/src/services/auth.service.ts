@@ -1,5 +1,4 @@
 import bcrypt from 'bcrypt';
-import { Prisma } from '@prisma/client';
 import prisma from '../db';
 import { JWTService, TokenPair } from '../utils/jwt';
 import { logger } from '../config/logger';

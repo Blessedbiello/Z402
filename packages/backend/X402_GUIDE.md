@@ -680,15 +680,15 @@ curl --user zcashrpc:password \
 
 ## Additional Resources
 
-- [X402 Protocol Specification](https://github.com/x402protocol/spec)
+- [X-402 Protocol Specification (Coinbase)](https://github.com/coinbase/x-402-protocol)
 - [Zcash RPC Documentation](https://zcash.readthedocs.io/en/latest/rtd_pages/rpc.html)
-- [Z402 API Documentation](./API.md)
+- [Z402 REST API Documentation](./API_SUMMARY.md)
 - [Database Schema](./DATABASE.md)
-- [Examples](./examples/)
+- [Zcash Integration Guide](./ZCASH_INTEGRATION.md)
+- [Example Implementations](../../examples/)
 
 ## Support
 
 For questions and support:
-- GitHub Issues: https://github.com/yourusername/z402/issues
-- Documentation: https://docs.z402.com
-- Community: https://discord.gg/z402
+- GitHub Issues: https://github.com/bprime/Z402/issues
+- Main Documentation: [README.md](../../README.md)

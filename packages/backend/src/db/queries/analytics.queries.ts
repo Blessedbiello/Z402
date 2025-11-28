@@ -158,7 +158,13 @@ export const analyticsQueries = {
     status: string;
     createdAt: Date;
   }) => {
-    const metrics = [
+    const metrics: Array<{
+      merchantId: string;
+      metricType: any;
+      value: any;
+      tags: any;
+      timestamp: Date;
+    }> = [
       // Payment count
       {
         merchantId: transaction.merchantId,
@@ -174,8 +180,8 @@ export const analyticsQueries = {
       metrics.push({
         merchantId: transaction.merchantId,
         metricType: MetricType.PAYMENT_VOLUME,
-        value: transaction.amount,
-        tags: { transactionId: transaction.id },
+        value: transaction.amount.toNumber(),
+        tags: { status: transaction.status },
         timestamp: transaction.createdAt,
       });
     }
@@ -192,7 +198,7 @@ export const analyticsQueries = {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const [volumeData, countData, transactions] = await Promise.all([
+    const [volumeData, , transactions] = await Promise.all([
       // Total volume
       prisma.analytics.aggregate({
         where: {

@@ -48,7 +48,7 @@ export class WebhookService {
           merchantId: data.merchantId,
           transactionId: data.transactionId,
           eventType: data.eventType,
-          payload: data.payload,
+          payload: data.payload as any,
           status: 'PENDING',
           attempts: 0,
           maxAttempts: this.MAX_RETRIES,

@@ -1,5 +1,5 @@
 import prisma from '../index';
-import { TransactionStatus, Prisma } from '@prisma/client';
+import { Prisma, TransactionStatus } from '@prisma/client';
 
 /**
  * Transaction Database Queries

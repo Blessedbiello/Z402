@@ -1,6 +1,6 @@
 import prisma from '../db';
 import { Redis } from 'ioredis';
-import config from '../config';
+import { config } from '../config';
 import { Prisma } from '@prisma/client';
 
 // Redis client for caching

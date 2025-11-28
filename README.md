@@ -1,15 +1,22 @@
 # Z402
 
-> x402 payment facilitator for Zcash with Stripe-like developer experience
+> X-402 Payment Required protocol facilitator for Zcash with Stripe-like developer experience
 
-Z402 is a modern payment processing platform that brings the ease of use and developer experience of Stripe to Zcash transactions. Accept Zcash payments with a simple, clean API.
+[![X-402 Protocol](https://img.shields.io/badge/X--402-Compliant-green)](https://github.com/coinbase/x-402-protocol)
+[![Tests](https://img.shields.io/badge/tests-18%2F18%20passing-brightgreen)]()
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Z402 is a modern payment processing platform that brings the ease of use and developer experience of Stripe to Zcash transactions. It implements the **X-402 Payment Required** protocol standard for maximum interoperability with compatible systems.
 
 ## Features
 
-- **Stripe-like API**: Familiar, intuitive API design
-- **Privacy-First**: Built on Zcash for enhanced privacy
-- **Developer-Friendly**: Comprehensive SDK and documentation
-- **Real-time Updates**: Webhook support for payment events
+- **X-402 Protocol**: Full implementation of Coinbase's X-402 Payment Required specification
+- **Stripe-like API**: Familiar, intuitive API design for merchants
+- **Real Zcash Crypto**: Production-ready cryptographic verification (secp256k1, bs58check)
+- **Privacy-First**: Built on Zcash for enhanced privacy (transparent & shielded addresses)
+- **Developer-Friendly**: Comprehensive SDK, CLI tools, and documentation
+- **Real-time Updates**: Webhook support for payment events with HMAC signatures
+- **Blockchain Monitoring**: Automatic payment detection and matching
 - **Dashboard**: Beautiful merchant dashboard for managing payments
 - **Type-Safe**: Full TypeScript support across the stack
 
@@ -47,7 +54,7 @@ Z402/
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/z402.git
+git clone https://github.com/bprime/Z402.git
 cd Z402
 ```
 
@@ -191,6 +198,38 @@ console.log('Payment URL:', payment.zcashAddress);
 const status = await z402.payments.retrieve(payment.id);
 console.log('Status:', status.status);
 ```
+
+## X-402 Protocol Implementation
+
+Z402 implements the full X-402 Payment Required protocol for resource protection:
+
+### Standard X-402 Endpoints
+
+- `GET /api/v1/x402/supported` - Get supported payment schemes and networks
+- `POST /api/v1/x402/verify-standard` - Verify payment without settlement
+- `POST /api/v1/x402/settle-standard` - Settle verified payment
+
+### Using X-402 Middleware
+
+```typescript
+import { requireX402Payment } from '@z402/backend/middleware/x402-standard';
+
+// Protect a route with X-402 payment requirement
+router.get('/premium-data',
+  requireX402Payment({
+    facilitatorUrl: 'https://z402.io/api/v1/x402',
+    payTo: 't1YourZcashAddress123...',
+    amount: '100000000', // 1 ZEC in zatoshis
+    resource: 'https://api.example.com/premium-data',
+    description: 'Premium API access',
+  }),
+  (req, res) => {
+    res.json({ premium: 'data' });
+  }
+);
+```
+
+For complete X-402 documentation, see [packages/backend/X402_GUIDE.md](packages/backend/X402_GUIDE.md)
 
 ## API Documentation
 

@@ -1,5 +1,5 @@
 import prisma from '../index';
-import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 /**
  * Merchant Database Queries
@@ -51,14 +51,14 @@ export const merchantQueries = {
       ...merchant,
       stats: {
         transactions: stats.reduce(
-          (acc, stat) => {
+          (acc: any, stat: any) => {
             acc[stat.status.toLowerCase()] = {
               count: stat._count,
               volume: stat._sum.amount || 0,
             };
             return acc;
           },
-          {} as Record<string, { count: number; volume: number | Prisma.Decimal }>
+          {} as Record<string, { count: number; volume: number | Decimal }>
         ),
       },
     };
