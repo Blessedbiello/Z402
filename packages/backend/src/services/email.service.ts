@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 import sendgrid from '@sendgrid/mail';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { config } from '../config';
-import { logger } from '../utils/logger';
+import { logger } from '../config/logger';
 
 export type EmailProvider = 'sendgrid' | 'aws-ses' | 'smtp' | 'console';
 

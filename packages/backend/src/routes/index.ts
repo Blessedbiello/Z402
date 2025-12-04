@@ -8,6 +8,7 @@ import keysRouter from './keys.routes';
 import transactionsRouter from './transactions.routes';
 import webhookManagementRouter from './webhook-management.routes';
 import analyticsRouter from './analytics.routes';
+import nearPaymentsRouter from './near-payments.routes';
 import {
   apiRateLimit,
   authRateLimit,
@@ -23,6 +24,7 @@ router.use('/auth', authRateLimit, authRouter);
 
 // API Routes (with general rate limiting)
 router.use('/payments', apiRateLimit, paymentsRouter);
+router.use('/near-payments', apiRateLimit, nearPaymentsRouter);
 router.use('/merchants', apiRateLimit, merchantsRouter);
 router.use('/webhooks', apiRateLimit, webhooksRouter);
 router.use('/x402', apiRateLimit, x402Router);
@@ -91,6 +93,13 @@ router.get('/', (_req, res) => {
         settle: 'POST /api/v1/x402/settle',
         status: 'GET /api/v1/x402/status/:id',
         health: 'GET /api/v1/x402/health',
+      },
+      // NEAR Intents Cross-Chain Payments
+      nearPayments: {
+        createIntent: 'POST /api/v1/near-payments/intents',
+        submitDeposit: 'POST /api/v1/near-payments/deposit',
+        getStatus: 'GET /api/v1/near-payments/status/:id',
+        supportedTokens: 'GET /api/v1/near-payments/supported-tokens',
       },
       // Legacy endpoints
       payments: '/api/v1/payments',

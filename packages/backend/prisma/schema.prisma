@@ -53,6 +53,7 @@ model Merchant {
   apiKeys               ApiKey[]
   webhookDeliveries     WebhookDelivery[]
   paymentIntents        PaymentIntent[]
+  nearIntents           NearIntent[]
   analytics             Analytics[]
 
   @@index([email])
@@ -299,6 +300,7 @@ model PaymentIntent {
   // Relations
   merchant          Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
   transactions      Transaction[]
+  nearIntents       NearIntent[]
 
   @@index([merchantId])
   @@index([status])
@@ -308,6 +310,60 @@ model PaymentIntent {
   @@index([createdAt])
   @@index([merchantId, status])
   @@map("payment_intents")
+}
+
+// ============================================================================
+// NEAR INTENTS (Cross-chain Payments)
+// ============================================================================
+
+model NearIntent {
+  id                    String              @id // NEAR request ID
+  paymentIntentId       String
+  merchantId            String
+
+  // Cross-chain Payment Details
+  originAsset           String              // Asset user pays with (e.g., USDC, ETH)
+  originAmount          String              // Amount in origin asset
+  destinationAsset      String              // ZEC asset ID
+  destinationAmount     String              // Amount in ZEC
+
+  // NEAR Intents Information
+  depositAddress        String              @unique // Unique deposit address for this swap
+  memo                  String?             // Memo for deposit (if required)
+
+  // Transaction Hashes
+  depositTxHash         String?             // User's deposit transaction
+  outputTxHash          String?             // ZEC output transaction
+
+  // Status
+  status                String              @default("PENDING") // PENDING, PROCESSING, SUCCESS, FAILED, etc.
+  verified              Boolean             @default(false) // Whether ZEC receipt was verified by Z402
+  errorMessage          String?
+
+  // Timing
+  estimatedTimeSeconds  Int                 // Estimated swap time
+  expiresAt             DateTime            // When quote expires
+
+  // Recipient/Refund
+  recipientAddress      String              // Merchant's ZEC address
+  refundAddress         String              // User's refund address
+  refundChainType       String              // Chain type for refund
+
+  // Timestamps
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  // Relations
+  merchant              Merchant            @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  paymentIntent         PaymentIntent       @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentIntentId])
+  @@index([merchantId])
+  @@index([depositAddress])
+  @@index([status])
+  @@index([createdAt])
+  @@index([merchantId, status])
+  @@map("near_intents")
 }
 
 // ============================================================================
