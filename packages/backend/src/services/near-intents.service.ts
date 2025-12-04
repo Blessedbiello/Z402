@@ -103,10 +103,13 @@ export class NearIntentsService {
     try {
       logger.info('Fetching supported tokens from NEAR Intents');
 
-      const response = await this.client.get<{ tokens: TokenInfo[] }>('/v0/tokens');
+      const response = await this.client.get<TokenInfo[]>('/v0/tokens');
 
-      logger.info('Retrieved supported tokens', { count: response.data.tokens.length });
-      return response.data.tokens;
+      // NEAR API returns array directly, not wrapped in { tokens: [] }
+      const tokens = Array.isArray(response.data) ? response.data : [];
+
+      logger.info('Retrieved supported tokens', { count: tokens.length });
+      return tokens;
     } catch (error) {
       logger.error('Failed to fetch supported tokens', error);
       throw new Error('Failed to retrieve supported tokens from NEAR Intents');
